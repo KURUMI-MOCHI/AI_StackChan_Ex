@@ -599,6 +599,11 @@ void setup()
 #endif
   bool full_config_loaded = load_system_config(sd_available);
 
+  // ★【追加】Wi-Fi接続やWebサーバー起動より前に、最優先で robot を生成する
+  if (robot == nullptr) {
+    robot = new Robot(system_config);
+  }
+
   // Wifi設定読み込み
   wifi_s* wifi_info = system_config.getWiFiSetting();
   Serial.printf("\nSSID: %s\n", wifi_info->ssid.c_str());
@@ -652,7 +657,7 @@ void setup()
     init_web_server();
     isWebServerEnabled = true;
     //FTPサーバ設定（SPIFFS用）
-    ftpSrv.begin("stackchan","stackchan");    //username, password for ftp.  set ports in ESP8266FtpServer.h  (default 21, 50009 for PASV)
+    ftpSrv.begin("stackchan","stackchan");
     Serial.println("FTP server started");
     M5.Lcd.println("FTP server started");
 
@@ -660,8 +665,8 @@ void setup()
     time_sync(NTPSRV, GMT_OFFSET, DAYLIGHT_OFFSET);
   }
 
-  robot = new Robot(system_config);
-  
+  // ★【削除】元々ここにあった robot = new Robot(system_config); は削除（上に移動したため）
+
   mp3_init();
 
   //mod設定
