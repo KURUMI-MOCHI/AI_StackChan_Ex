@@ -329,7 +329,7 @@ GeminiLive::GeminiLive(llm_param_t param) : RealtimeLLMBase(param)
 
 
 void GeminiLive::load_role(){
-  Serial.println("Load role from SPIFFS.");
+  Serial.println("Load role...");
   if(enableMemory()){
     systemRole = systemRole_memory;
   }else{
@@ -337,24 +337,32 @@ void GeminiLive::load_role(){
   }
   systemRole += " " + systemRole_realtimeAvatarExpression;
 
-  if(load_system_prompt_from_spiffs()){
+  // --- 【追加】1. SDカード/設定パラメータからのプロンプトを最優先でチェック ---
+  String sdPrompt = robot->m_config.getExConfig().system_prompt;
+
+  if (sdPrompt.length() > 0) {
+    Serial.println("SD card prompt found and applied!");
+    role = sdPrompt; // SDカード側のプロンプトを採用！
+  }
+  // --- 2. SDカードの設定がない場合は従来のSPIFFS読み込みを実施 ---
+  else if(load_system_prompt_from_spiffs()){
     role = String((const char*)systemPrompt["messages"][SYSTEM_PROMPT_INDEX_USER_ROLE]["content"]);
-    //Serial.printf("role length: %d\n", role.length());
     if (role == "") {
       Serial.println("SPIFFS user role is empty. set default role.");
       role = defaultRole;
     }
+  }else{
+    role = defaultRole;
+  }
 
+  // --- ユーザー情報の読み込み処理 ---
+  if(load_system_prompt_from_spiffs()){
     userInfo = String((const char*)systemPrompt["messages"][SYSTEM_PROMPT_INDEX_USER_INFO]["content"]);
-    //Serial.println(userInfo);
     int idx = userInfo.indexOf("User Info");
     if(idx < 0 || !enableMemory()){
       userInfo = "User Info: ";
     }
   }else{
-    // load_system_prompt_from_spiffs()内でSPIFFSからの取得失敗かつ
-    // デフォルトのシステムプロンプト設定に失敗した場合（通常起こり得ない）。
-    role = defaultRole;
     userInfo = "User Info: ";
   }
 }

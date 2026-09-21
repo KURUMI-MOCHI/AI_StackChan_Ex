@@ -1,73 +1,85 @@
-#ifndef CUSTOM_FACE_H
-#define CUSTOM_FACE_H
+#ifndef CUSTOMFACE_H_
+#define CUSTOMFACE_H_
 
+#include <M5Unified.h>
 #include <Avatar.h>
 
 using namespace m5avatar;
 
-// --- カスタム口パーツ（角丸アニメーション付き） ---
+// --- カスタムの目 (CustomEye) ---
+class CustomEye : public Drawable {
+private:
+  bool isRight;
+
+public:
+  CustomEye(bool isRight = true) : isRight(isRight) {}
+
+  void draw(M5Canvas *canvas, BoundingRect rect, DrawContext *drawContext) override {
+    // 1. m5avatar の DrawContext からパラメータを取得
+    m5avatar::Gaze gaze = drawContext->getGaze();
+    float gazeV = gaze.getVertical();   // 垂直方向の視線
+    float gazeH = gaze.getHorizontal(); // 水平方向の視線
+
+    float openRatio = drawContext->getEyeOpenRatio(); // 目の開き具合 (0.0 ~ 1.0)
+    uint16_t color = drawContext->getColorPalette()->get(COLOR_PRIMARY);
+
+    int cx = rect.getCenterX();
+    int cy = rect.getCenterY();
+
+    // 視線によるわずかな視点移動
+    cx += (int)(gazeH * 5.0f);
+    cy += (int)(gazeV * 5.0f);
+
+    int eyeWidth = 50;
+    int eyeHeight = (int)(60.0f * openRatio);
+
+    // まばたき等で高さが極端に低い場合は描画をスキップ
+    if (eyeHeight < 2) return;
+
+    // 目の外枠と白目領域を描画
+    canvas->fillEllipse(cx, cy, eyeWidth / 2, eyeHeight / 2, color);
+    canvas->fillEllipse(cx, cy, eyeWidth / 2 - 4, eyeHeight / 2 - 4, TFT_WHITE);
+
+    // 瞳の描画
+    int pupilRadius = 10;
+    canvas->fillCircle(cx, cy, pupilRadius, color);
+  }
+};
+
+// --- カスタムの口 (CustomMouth) ---
 class CustomMouth : public Drawable {
 public:
   void draw(M5Canvas *canvas, BoundingRect rect, DrawContext *drawContext) override {
-    float open = drawContext->getMouthOpenRatio(); // 開口率 (0.0 〜 1.0)
+    float openRatio = drawContext->getMouthOpenRatio(); // 口の開き具合 (0.0 ~ 1.0)
     uint16_t color = drawContext->getColorPalette()->get(COLOR_PRIMARY);
 
-    // 公式パラメータに基づく開口アニメーション計算
-    // 閉じ口: 幅90, 高さ6, 角丸0
-    // 開き口: 幅60, 高さ50, 角丸16
-    int w = 90 - (int)(30.0f * open);
-    int h = 6 + (int)(44.0f * open);
-    int r = (int)(16.0f * open);
+    int cx = rect.getCenterX();
+    int cy = rect.getCenterY();
 
-    int x = rect.getCenterX() - (w / 2);
-    int y = rect.getCenterY() - (h / 2);
+    int mouthWidth = 60;
+    int mouthHeight = (int)(40.0f * openRatio);
 
-    if (r > 0) {
-      canvas->fillRoundRect(x, y, w, h, r, color);
+    if (mouthHeight < 4) {
+      // 閉じている時は横線を描画
+      canvas->drawFastHLine(cx - mouthWidth / 2, cy, mouthWidth, color);
     } else {
-      canvas->fillRect(x, y, w, h, color);
+      // 開いている時は楕円を描画
+      canvas->fillEllipse(cx, cy, mouthWidth / 2, mouthHeight / 2, color);
     }
   }
 };
 
-// --- カスタム目パーツ（公式基準サイズ） ---
-class CustomEye : public Drawable {
-private:
-  bool isLeft;
-
-public:
-  CustomEye(bool isLeft = true) : isLeft(isLeft) {}
-
-  void draw(M5Canvas *canvas, BoundingRect rect, DrawContext *drawContext) override {
-    float gazeX, gazeY;
-    drawContext->getGaze(&gazeY, &gazeX); // 視線移動
-
-    uint16_t color = drawContext->getColorPalette()->get(COLOR_PRIMARY);
-
-    // 視線オフセット（最大±16px）
-    int offsetX = (int)(16.0f * gazeX);
-    int offsetY = (int)(16.0f * gazeY);
-
-    int cx = rect.getCenterX() + offsetX;
-    int cy = rect.getCenterY() + offsetY;
-    int r = 16; // 公式基準半径 16px
-
-    canvas->fillCircle(cx, cy, r, color);
-  }
-};
-
-// --- カスタム Face クラスの定義 ---
+// --- カスタム顔 (CustomFace) ---
 class CustomFace : public Face {
 public:
   CustomFace()
-      : Face(
-            new CustomMouth(),
-            new BoundingRect(160, 146), // 口の配置位置 (X=160, Y=146)
-            new CustomEye(true),
-            new BoundingRect(90, 104),  // 左目の配置位置 (X=90, Y=104)
-            new CustomEye(false),
-            new BoundingRect(230, 104)  // 右目の配置位置 (X=230, Y=104)
-        ) {}
+    : Face(
+        new CustomMouth(), new BoundingRect(163, 148),
+        new CustomEye(true), new BoundingRect(93, 90),
+        new CustomEye(false), new BoundingRect(93, 230),
+        //new Eyeblow(15, 6, true),  new BoundingRect(67, 90),   // 右眉を追加
+        //new Eyeblow(15, 6, false), new BoundingRect(67, 230)  // 左眉を追加
+      ) {}
 };
 
-#endif // CUSTOM_FACE_H
+#endif // CUSTOMFACE_H_
