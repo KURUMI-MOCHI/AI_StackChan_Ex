@@ -35,10 +35,14 @@ RealtimeAiMod::RealtimeAiMod(bool _isOffline)
   box_BtnA.setupBox(0, 100, 40, 60);
   box_BtnC.setupBox(280, 100, 40, 60);
 
-  pRtLLM = (RealtimeLLMBase*)robot->llm;
-  pRtLLM->invokeWebSocketLoopTask();
-
-  //servo_home = false;
+  // ★【修正】robot および robot->llm のヌルチェックを追加
+  if (robot != nullptr && robot->llm != nullptr) {
+    pRtLLM = (RealtimeLLMBase*)robot->llm;
+    pRtLLM->invokeWebSocketLoopTask();
+  } else {
+    pRtLLM = nullptr;
+    Serial.println("[Warning] robot or robot->llm is null in RealtimeAiMod constructor!");
+  }
 
 #if 0
   if(!isOffline){
@@ -136,13 +140,16 @@ void RealtimeAiMod::idle(void)
 {
 #ifdef REALTIME_API_WITH_TTS
 
-  if(robot->asyncPlaying || (pRtLLM->getOutputTextQueueSize() != 0)){
-    // 発話中
-    pRtLLM->setSpeaking(true);
-  }
-  else{
-    // 発話停止中かつキューにテキストがない場合はLLM機能に発話終了を通知
-    pRtLLM->setSpeaking(false);
+  // ★【修正】robot と pRtLLM の安全チェックを追加
+  if (robot != nullptr && pRtLLM != nullptr) {
+    if(robot->asyncPlaying || (pRtLLM->getOutputTextQueueSize() != 0)){
+      // 発話中
+      pRtLLM->setSpeaking(true);
+    }
+    else{
+      // 発話停止中かつキューにテキストがない場合はLLM機能に発話終了を通知
+      pRtLLM->setSpeaking(false);
+    }
   }
 
 #endif  //REALTIME_API_WITH_TTS
