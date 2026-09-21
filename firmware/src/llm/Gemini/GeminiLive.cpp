@@ -325,6 +325,8 @@ GeminiLive::GeminiLive(llm_param_t param) : RealtimeLLMBase(param)
   // try ever 5000 again if connection has failed
   webSocket.setReconnectInterval(5000);
 
+  // ★【追加】WebSocketの設定が完了したため、処理許可フラグを立てる★
+  isWsInitialized = true;
 }
 
 

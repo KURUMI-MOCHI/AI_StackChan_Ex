@@ -49,6 +49,7 @@ RealtimeLLMBase::RealtimeLLMBase(llm_param_t param) :
     rtRecLength(RT_REC_LENGTH),
     realtime_recording(false),
     response_done(false),
+    isWsInitialized(false), // ★ここを追加★
     startTime(0),
     nextBufIdx(0),
     outputText(String(""))
@@ -72,8 +73,8 @@ RealtimeLLMBase::RealtimeLLMBase(llm_param_t param) :
 
 void RealtimeLLMBase::webSocketProcess()
 {
-    // ★【追加】安全ガード: インスタンスや必要リソースが未準備の場合は処理を回避
-    if (this == nullptr) {
+    // ★【修正】未準備または WebSocket 初期化前は loop() を呼ばずに待機★
+    if (this == nullptr || !isWsInitialized) {
         vTaskDelay(pdMS_TO_TICKS(100));
         return;
     }

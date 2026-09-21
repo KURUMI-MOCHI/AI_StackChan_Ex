@@ -40,6 +40,7 @@ public:   //本当はprivateにしたいところだがコールバック関数�
     int rtRecLength;
     bool realtime_recording;
     bool response_done;
+    bool isWsInitialized;  // ★ここを追加★
     portTickType startTime;
 
 #ifdef REALTIME_API_RECORD_TEST
