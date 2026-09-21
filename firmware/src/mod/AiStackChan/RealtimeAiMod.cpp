@@ -35,29 +35,23 @@ RealtimeAiMod::RealtimeAiMod(bool _isOffline)
   box_BtnA.setupBox(0, 100, 40, 60);
   box_BtnC.setupBox(280, 100, 40, 60);
 
-  // ★【修正】robot および robot->llm のヌルチェックを追加
+  // ★【修正】コンストラクタではポインタ保持のみ行い、タスク起動は行わない
   if (robot != nullptr && robot->llm != nullptr) {
     pRtLLM = (RealtimeLLMBase*)robot->llm;
-    pRtLLM->invokeWebSocketLoopTask();
   } else {
     pRtLLM = nullptr;
     Serial.println("[Warning] robot or robot->llm is null in RealtimeAiMod constructor!");
   }
-
-#if 0
-  if(!isOffline){
-    //スケジューラ設定
-    init_schedule();
-  }
-#endif
 }
-
 
 void RealtimeAiMod::init(void)
 {
-  //avatar.setSpeechText("Realtime AI");
   avatar.set_isSubWindowEnable(true);
-  pRtLLM->resumeWebSocketLoopTask();
+
+  // ★【修正】安全なタイミングで WebSocket タスクを起動・再開する
+  if (pRtLLM != nullptr) {
+    pRtLLM->invokeWebSocketLoopTask();
+  }
 }
 
 void RealtimeAiMod::pause(void)

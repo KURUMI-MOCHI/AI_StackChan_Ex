@@ -45,6 +45,7 @@ void asyncTtsStreamTask(void *arg) {
 
 Robot::Robot(StackchanExConfig& config) : m_config(config)
 {
+  robot = this; // ★【追加】コンストラクタ先頭でグローバル変数 robot にアドレスを設定
   // Servo setting
   //
 #ifdef USE_SERVO

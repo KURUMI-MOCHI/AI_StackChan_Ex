@@ -239,12 +239,17 @@ void RealtimeLLMBase::streamAudioDelta(String& delta)
 
 void RealtimeLLMBase::invokeWebSocketLoopTask(void)
 {
-    xTaskCreate(webSocketLoopTask, /* Function to implement the task */
-            "webSocketLoopTask", /* Name of the task */
-            6*1024,               /* Stack size in words */
-            this,                 /* Task input parameter */
-            3,                    /* Priority of the task */
-            &webSocketLoopTask_h);                /* Task handle. */
+    // ★【修正】すでにタスクが生成されている場合は再開処理を行い、二重生成を防ぐ
+    if (webSocketLoopTask_h == NULL) {
+        xTaskCreate(webSocketLoopTask,
+                    "webSocketLoopTask",
+                    6*1024,
+                    this,
+                    3,
+                    &webSocketLoopTask_h);
+    } else {
+        resumeWebSocketLoopTask();
+    }
 }
 
 void RealtimeLLMBase::suspendWebSocketLoopTask(void)
