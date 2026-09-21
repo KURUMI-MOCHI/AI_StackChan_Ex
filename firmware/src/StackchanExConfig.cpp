@@ -290,6 +290,7 @@ void StackchanExConfig::setExtendSettings(DynamicJsonDocument doc)
         _ex_parameters.llm.mcpServer[i].port = doc["llm"]["mcpServers"][i]["port"].as<int>();
     }
     _ex_parameters.llm.enableMemory = doc["llm"]["enableMemory"].as<bool>();
+    _ex_parameters.llm.system_prompt = doc["llm"]["system_prompt"].as<String>(); // ← この行を追加
     _ex_parameters.llm.customRootCA = "";
     // Build the trusted CA bundle from a single customRootCAFile (string) and/or a
     // customRootCAFiles list. Each PEM file is appended into one buffer; mbedTLS

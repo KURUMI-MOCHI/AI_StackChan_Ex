@@ -337,15 +337,19 @@ void GeminiLive::load_role(){
   }
   systemRole += " " + systemRole_realtimeAvatarExpression;
 
-  // --- 1. SDカード/設定パラメータからのプロンプトを最優先でチェック ---
-  // ExConfig のメンバ名は systemPrompt (キャメルケース) です
-  String sdPrompt = robot->m_config.getExConfig().systemPrompt;
+  // --- 1. SDカードのYAMLからのプロンプトを安全にチェック ---
+  String sdPrompt = "";
+  if (robot != nullptr) {
+    sdPrompt = robot->m_config.getExConfig().llm.system_prompt;
+  } else {
+    Serial.println("Warning: 'robot' pointer is null in load_role()");
+  }
 
   if (sdPrompt.length() > 0) {
     Serial.println("SD card prompt found and applied!");
-    role = sdPrompt; // SDカード側のプロンプトを採用
+    role = sdPrompt;
   }
-  // --- 2. SDカードの設定がない場合は従来のSPIFFS読み込みを実施 ---
+  // --- 2. SDカードの設定がない場合はSPIFFSから読み込み ---
   else if(load_system_prompt_from_spiffs()){
     role = String((const char*)systemPrompt["messages"][SYSTEM_PROMPT_INDEX_USER_ROLE]["content"]);
     if (role == "") {
@@ -356,7 +360,7 @@ void GeminiLive::load_role(){
     role = defaultRole;
   }
 
-  // --- ユーザー情報の読み込み処理 ---
+  // --- ユーザー情報の読み込み ---
   if(load_system_prompt_from_spiffs()){
     userInfo = String((const char*)systemPrompt["messages"][SYSTEM_PROMPT_INDEX_USER_INFO]["content"]);
     int idx = userInfo.indexOf("User Info");
