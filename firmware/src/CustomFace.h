@@ -77,8 +77,8 @@ public:
         new CustomMouth(), new BoundingRect(163, 148),
         new CustomEye(true), new BoundingRect(93, 90),
         new CustomEye(false), new BoundingRect(93, 230),
-        //new Eyeblow(15, 6, true),  new BoundingRect(67, 90),   // 右眉を追加
-        //new Eyeblow(15, 6, false), new BoundingRect(67, 230)  // 左眉を追加
+        nullptr, nullptr,  // 左眉なし
+        nullptr, nullptr   // 右眉なし
       ) {}
 };
 

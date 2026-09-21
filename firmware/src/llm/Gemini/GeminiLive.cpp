@@ -337,12 +337,13 @@ void GeminiLive::load_role(){
   }
   systemRole += " " + systemRole_realtimeAvatarExpression;
 
-  // --- 【追加】1. SDカード/設定パラメータからのプロンプトを最優先でチェック ---
-  String sdPrompt = robot->m_config.getExConfig().system_prompt;
+  // --- 1. SDカード/設定パラメータからのプロンプトを最優先でチェック ---
+  // ExConfig のメンバ名は systemPrompt (キャメルケース) です
+  String sdPrompt = robot->m_config.getExConfig().systemPrompt;
 
   if (sdPrompt.length() > 0) {
     Serial.println("SD card prompt found and applied!");
-    role = sdPrompt; // SDカード側のプロンプトを採用！
+    role = sdPrompt; // SDカード側のプロンプトを採用
   }
   // --- 2. SDカードの設定がない場合は従来のSPIFFS読み込みを実施 ---
   else if(load_system_prompt_from_spiffs()){
