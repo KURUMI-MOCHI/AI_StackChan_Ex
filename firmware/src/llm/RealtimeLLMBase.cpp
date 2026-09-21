@@ -33,8 +33,11 @@ void webSocketLoopTask(void *arg) {
     RealtimeLLMBase* pThis = (RealtimeLLMBase*)arg;
 
     while(1){
-        pThis->webSocketProcess();
-        //delay(1);     //webSocketProcess()内で状態によってスリープ時間を変更
+        if (pThis != nullptr) {
+            pThis->webSocketProcess();
+        } else {
+            vTaskDelay(pdMS_TO_TICKS(100));
+        }
     }
 }
 
@@ -69,6 +72,12 @@ RealtimeLLMBase::RealtimeLLMBase(llm_param_t param) :
 
 void RealtimeLLMBase::webSocketProcess()
 {
+    // ★【追加】安全ガード: インスタンスや必要リソースが未準備の場合は処理を回避
+    if (this == nullptr) {
+        vTaskDelay(pdMS_TO_TICKS(100));
+        return;
+    }
+
     webSocket.loop();
 
 #ifdef REALTIME_API_WITH_TTS
