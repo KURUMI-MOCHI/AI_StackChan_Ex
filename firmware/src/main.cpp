@@ -540,28 +540,14 @@ void init_mic_spk()
 
 void setup()
 {
-  /// シリアル出力のログレベルを VERBOSEに設定
-  //M5.Log.setLogLevel(m5::log_target_serial, ESP_LOG_VERBOSE);
-
   auto cfg = M5.config();
-
 #if defined(ARDUINO_M5STACK_ATOMS3R)
   cfg.internal_spk = false;
   cfg.internal_mic = false;
   cfg.external_speaker.atomic_echo = true;
 #endif
-  cfg.serial_baudrate = 115200;   //M5Unified 0.1.17からデフォルトが0になったため設定
+  cfg.serial_baudrate = 115200;
   M5.begin(cfg);
-
-  ///// Debug /////
-#if 0
-  check_board();
-  Wire.begin(); 
-  i2c_scan(Wire);
-  Wire1.begin(); 
-  i2c_scan(Wire1);
-#endif
-  /////////////////
 
 #if defined(ARDUINO_M5STACK_ATOMS3R)
   M5.Lcd.setTextSize(2);
@@ -576,17 +562,11 @@ void setup()
   initMutex();
 
 #if defined(ENABLE_SD_UPDATER)
-  // ***** for SD-Updater *********************
   SDU_lobby("AiStackChanEx");
-  // ******************************************
 #endif
-
-  //auto brightness = M5.Display.getBrightness();
-  //Serial.printf("Brightness: %d\n", brightness);
 
   init_mic_spk();
 
-  /// settings
   if(!SPIFFS.begin(true)){
     M5.Lcd.print("Failed to mount SPIFFS. System reset after 5 seconds.");
     delay(5000);
@@ -597,9 +577,11 @@ void setup()
 #if !defined(ARDUINO_M5STACK_ATOMS3R)
   sd_available = SD.begin(GPIO_NUM_4, SPI, 25000000);
 #endif
+
+  // 1. まず設定ファイルを読み込む
   bool full_config_loaded = load_system_config(sd_available);
 
-  // ★【追加】Wi-Fi接続やWebサーバー起動より前に、最優先で robot を生成する
+  // 2. 最優先で robot のインスタンスを作成する
   if (robot == nullptr) {
     robot = new Robot(system_config);
   }
@@ -622,11 +604,6 @@ void setup()
     M5.Display.setTextColor(TFT_WHITE, TFT_BLACK);
     M5.Display.setCursor(0, 0);
     M5.Display.println("Config incomplete.");
-    M5.Display.println("");
-    M5.Display.println("Missing one or more files:");
-    M5.Display.println("SC_BasicConfig.yaml");
-    M5.Display.println("SC_SecConfig.yaml");
-    M5.Display.println("SC_ExConfig.yaml");
     while(true){
       M5.update();
       delay(100);
@@ -653,23 +630,19 @@ void setup()
     M5.Lcd.println(WiFi.localIP());
     delay(1000);
 
-    //Webサーバ設定
     init_web_server();
     isWebServerEnabled = true;
-    //FTPサーバ設定（SPIFFS用）
+
     ftpSrv.begin("stackchan","stackchan");
     Serial.println("FTP server started");
     M5.Lcd.println("FTP server started");
 
-    //時刻同期
     time_sync(NTPSRV, GMT_OFFSET, DAYLIGHT_OFFSET);
   }
 
-  // ★【削除】元々ここにあった robot = new Robot(system_config); は削除（上に移動したため）
-
   mp3_init();
 
-  //mod設定
+  // 3. mod（RealtimeAiMod 等）の初期化を「WebSocket接続」より前に行う
   init_mod();
 
 #if defined(ARDUINO_M5STACK_ATOMS3R)
@@ -681,9 +654,8 @@ void setup()
   avatar.setPosition(-56, -96);
   avatar.init();
 #else
-  customFace = new CustomFace(); // ★新規追加
-  avatar.setFace(customFace);   // ★新規追加
-  //avatar.init();
+  customFace = new CustomFace();
+  avatar.setFace(customFace);
   avatar.init(16);
 #endif
 
@@ -714,15 +686,11 @@ void setup()
   invokeDoubleTapDetectTask();
 #endif
 
-  //init_watchdog();
-
-  //ヒープメモリ残量確認(デバッグ用)
   check_heap_free_size();
   check_heap_largest_free_block();
 
 END:
-  // Nothing to do.
-  return ;
+  return;
 }
 
 
