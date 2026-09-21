@@ -22,6 +22,7 @@
 #include "mod/VolumeSetting/VolumeSettingMod.h"
 #include "mod/QRdisplay/QRdisplayMod.h"
 #include "mod/EspNowRemote/EspNowRemoteMod.h"
+#include "CustomFace.h"
 
 #include "driver/PlayMP3.h"   //lipSync
 #include "driver/TapDetect.h"
@@ -662,6 +663,8 @@ void setup()
   avatar.setPosition(-56, -96);
   avatar.init();
 #else
+  customFace = new CustomFace(); // ★新規追加
+  avatar.setFace(customFace);   // ★新規追加
   //avatar.init();
   avatar.init(16);
 #endif
