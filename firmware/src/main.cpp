@@ -169,16 +169,27 @@ void lipSync(void *args)
   Avatar *avatar = ctx->getAvatar();
   for (;;)
   {
+    level = 0; // 初期値
+
+    if (robot != nullptr) {
 #ifdef REALTIME_API
 #ifdef REALTIME_API_WITH_TTS
-    level = robot->tts->getLevel();
+      if (robot->tts != nullptr) {
+        level = robot->tts->getLevel();
+      }
 #else
-    level = ((RealtimeLLMBase*)(robot->llm))->getAudioLevel();
+      if (robot->llm != nullptr) {
+        level = ((RealtimeLLMBase*)(robot->llm))->getAudioLevel();
+      }
 #endif
 #else
-    level = robot->tts->getLevel();
+      if (robot->tts != nullptr) {
+        level = robot->tts->getLevel();
+      }
 #endif
-    if(level<100) level = 0;
+    }
+
+    if(level < 100) level = 0;
     if(level > 15000)
     {
       level = 15000;
@@ -206,12 +217,14 @@ void servo(void *args)
       continue;
     }
 
-    if(!servo_home)
-    {
-      avatar->getGaze(&gazeY, &gazeX);
-      robot->servo->moveTo((int)(15.0 * gazeX), (int)(10.0 * gazeY));
-    } else {
-      robot->servo->moveToOrigin();
+    if (robot != nullptr && robot->servo != nullptr) {
+      if(!servo_home)
+      {
+        avatar->getGaze(&gazeY, &gazeX);
+        robot->servo->moveTo((int)(15.0 * gazeX), (int)(10.0 * gazeY));
+      } else {
+        robot->servo->moveToOrigin();
+      }
     }
 #endif
     delay(5000);
