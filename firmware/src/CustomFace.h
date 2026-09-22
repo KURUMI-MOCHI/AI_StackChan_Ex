@@ -1,85 +1,145 @@
-#ifndef CUSTOMFACE_H_
-#define CUSTOMFACE_H_
+#ifndef CUSTOM_FACE_H
+#define CUSTOM_FACE_H
 
-#include <M5Unified.h>
 #include <Avatar.h>
 
 using namespace m5avatar;
 
-// --- カスタムの目 (CustomEye) ---
-class CustomEye : public Drawable {
-private:
-  bool isRight;
-
+// --- 描画を行わないダミーパーツ（眉毛消去用） ---
+class BlankDrawable : public Drawable {
 public:
-  CustomEye(bool isRight = true) : isRight(isRight) {}
-
   void draw(M5Canvas *canvas, BoundingRect rect, DrawContext *drawContext) override {
-    // 1. m5avatar の DrawContext からパラメータを取得
-    m5avatar::Gaze gaze = drawContext->getGaze();
-    float gazeV = gaze.getVertical();   // 垂直方向の視線
-    float gazeH = gaze.getHorizontal(); // 水平方向の視線
-
-    float openRatio = drawContext->getEyeOpenRatio(); // 目の開き具合 (0.0 ~ 1.0)
-    uint16_t color = drawContext->getColorPalette()->get(COLOR_PRIMARY);
-
-    int cx = rect.getCenterX();
-    int cy = rect.getCenterY();
-
-    // 視線によるわずかな視点移動
-    cx += (int)(gazeH * 5.0f);
-    cy += (int)(gazeV * 5.0f);
-
-    int eyeWidth = 50;
-    int eyeHeight = (int)(60.0f * openRatio);
-
-    // まばたき等で高さが極端に低い場合は描画をスキップ
-    if (eyeHeight < 2) return;
-
-    // 目の外枠と白目領域を描画
-    canvas->fillEllipse(cx, cy, eyeWidth / 2, eyeHeight / 2, color);
-    canvas->fillEllipse(cx, cy, eyeWidth / 2 - 4, eyeHeight / 2 - 4, TFT_WHITE);
-
-    // 瞳の描画
-    int pupilRadius = 10;
-    canvas->fillCircle(cx, cy, pupilRadius, color);
+    // 眉毛は描画しない
   }
 };
 
-// --- カスタムの口 (CustomMouth) ---
+// --- 製品版 mouth.cpp を完全トレースした口パーツ ---
 class CustomMouth : public Drawable {
 public:
   void draw(M5Canvas *canvas, BoundingRect rect, DrawContext *drawContext) override {
-    float openRatio = drawContext->getMouthOpenRatio(); // 口の開き具合 (0.0 ~ 1.0)
+    float open = drawContext->getMouthOpenRatio(); // 0.0 〜 1.0 (weight 0 〜 100)
     uint16_t color = drawContext->getColorPalette()->get(COLOR_PRIMARY);
 
-    int cx = rect.getCenterX();
-    int cy = rect.getCenterY();
+    // mouth.cpp の定数から線形補間
+    int w = 90 - (int)(30.0f * open);
+    int h = 6 + (int)(44.0f * open);
+    int r = (int)(16.0f * open);
 
-    int mouthWidth = 60;
-    int mouthHeight = (int)(40.0f * openRatio);
+    int x = rect.getCenterX() - (w / 2);
+    int y = rect.getCenterY() - (h / 2);
 
-    if (mouthHeight < 4) {
-      // 閉じている時は横線を描画
-      canvas->drawFastHLine(cx - mouthWidth / 2, cy, mouthWidth, color);
+    if (r > 0) {
+      canvas->fillRoundRect(x, y, w, h, r, color);
     } else {
-      // 開いている時は楕円を描画
-      canvas->fillEllipse(cx, cy, mouthWidth / 2, mouthHeight / 2, color);
+      canvas->fillRect(x, y, w, h, color);
     }
   }
 };
 
-// --- カスタム顔 (CustomFace) ---
+// --- 製品版 eyes.cpp (まぶたマスク + 回転) を完全トレースした目パーツ ---
+class CustomEye : public Drawable {
+private:
+  bool isLeft;
+
+public:
+  CustomEye(bool isLeft = true) : isLeft(isLeft) {}
+
+  void draw(M5Canvas *canvas, BoundingRect rect, DrawContext *drawContext) override {
+    // 1. Emotion（表情）に応じた weight と rotation (deg) の決定
+    int weight = 100;
+    float rotationDeg = 0.0f;
+
+    Expression exp = drawContext->getExpression();
+    switch (exp) {
+      case Expression::Happy:
+        weight = 72;
+        rotationDeg = 15.5f; // eyes.cpp の 1550 (0.1度単位)
+        break;
+      case Expression::Angry:
+        weight = 70;
+        rotationDeg = 4.5f;  // eyes.cpp の 450
+        break;
+      case Expression::Sad:
+        weight = 70;
+        rotationDeg = -4.0f; // eyes.cpp の -400
+        break;
+      case Expression::Sleepy:
+        weight = 35;
+        rotationDeg = -0.5f; // eyes.cpp の -50
+        break;
+      case Expression::Doubt:
+        weight = 75;
+        rotationDeg = 0.0f;
+        break;
+      case Expression::Neutral:
+      default:
+        weight = 100;
+        rotationDeg = 0.0f;
+        break;
+    }
+
+    // まばたき（EyeOpenRatio）による上書き処理
+    float openRatio = drawContext->getEyeOpenRatio();
+    if (openRatio < 1.0f) {
+      weight = (int)(weight * openRatio);
+    }
+
+    // 右目の回転角度は反転 (eyes.cpp: setRotation(-rotation))
+    if (!isLeft) {
+      rotationDeg = -rotationDeg;
+    }
+
+    // 2. まぶたのY座標オフセット計算
+    int eyelidOffsetY = -((weight * 32) / 100);
+
+    // 3. カラーパレットの取得
+    uint16_t primaryColor = drawContext->getColorPalette()->get(COLOR_PRIMARY);
+    uint16_t bgColor = drawContext->getColorPalette()->get(COLOR_BACKGROUND);
+
+    // 4. オフスクリーンスプライト (32x32) の生成とパーツ合成
+    M5Canvas eyeSpr(canvas);
+    eyeSpr.createSprite(32, 32);
+    eyeSpr.fillSprite(bgColor);
+
+    // 目（中心16,16 半径16の円）
+    eyeSpr.fillCircle(16, 16, 16, primaryColor);
+
+    // まぶた（上部からの遮蔽マスク）
+    int coverHeight = 32 + eyelidOffsetY;
+    if (coverHeight > 0) {
+      eyeSpr.fillRect(0, 0, 32, coverHeight, bgColor);
+    }
+
+    // 5. 視線（Gaze）オフセット計算
+    Gaze gaze = drawContext->getGaze();
+    int offsetX = (int)(16.0f * gaze.getHorizontal());
+    int offsetY = (int)(16.0f * gaze.getVertical());
+
+    int cx = rect.getCenterX() + offsetX;
+    int cy = rect.getCenterY() + offsetY;
+
+    // 6. 指定のピボット中心で回転描画してメインキャンバスへ転送
+    eyeSpr.pushRotateZoom(canvas, cx, cy, rotationDeg, 1.0f, 1.0f, bgColor);
+    eyeSpr.deleteSprite();
+  }
+};
+
+// --- 製品版のレイアウト座標を適用した CustomFace ---
 class CustomFace : public Face {
 public:
   CustomFace()
-    : Face(
-        new CustomMouth(), new BoundingRect(163, 148),
-        new CustomEye(true), new BoundingRect(93, 90),
-        new CustomEye(false), new BoundingRect(93, 230),
-        nullptr, nullptr,  // 左眉なし
-        nullptr, nullptr   // 右眉なし
-      ) {}
+      : Face(
+            new CustomMouth(),
+            new BoundingRect(160, 146), // 口: _mouth_pos(0, 26) -> (160, 146)
+            new CustomEye(false),
+            new BoundingRect(230, 104), // 右目: _eye_pos(70, -16) -> (230, 104)
+            new CustomEye(true),
+            new BoundingRect(90, 104),  // 左目: _eye_pos(-70, -16) -> (90, 104)
+            new BlankDrawable(),
+            new BoundingRect(0, 0),     // 眉毛削除
+            new BlankDrawable(),
+            new BoundingRect(0, 0)      // 眉毛削除
+        ) {}
 };
 
-#endif // CUSTOMFACE_H_
+#endif // CUSTOM_FACE_H
