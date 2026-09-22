@@ -2,6 +2,7 @@
 #define CUSTOM_FACE_H
 
 #include <Avatar.h>
+#include <cmath>
 
 using namespace m5avatar;
 
@@ -17,10 +18,9 @@ public:
 class CustomMouth : public Drawable {
 public:
   void draw(M5Canvas *canvas, BoundingRect rect, DrawContext *drawContext) override {
-    float open = drawContext->getMouthOpenRatio(); // 0.0 〜 1.0 (weight 0 〜 100)
+    float open = drawContext->getMouthOpenRatio(); // 0.0 〜 1.0
     uint16_t color = drawContext->getColorPalette()->get(COLOR_PRIMARY);
 
-    // mouth.cpp の定数から線形補間
     int w = 90 - (int)(30.0f * open);
     int h = 6 + (int)(44.0f * open);
     int r = (int)(16.0f * open);
@@ -36,7 +36,7 @@ public:
   }
 };
 
-// --- 製品版 eyes.cpp (まぶたマスク + 回転) を完全トレースした目パーツ ---
+// --- スプライト無しで直接高精度描画する目パーツ ---
 class CustomEye : public Drawable {
 private:
   bool isLeft;
@@ -45,7 +45,7 @@ public:
   CustomEye(bool isLeft = true) : isLeft(isLeft) {}
 
   void draw(M5Canvas *canvas, BoundingRect rect, DrawContext *drawContext) override {
-    // 1. Emotion（表情）に応じた weight と rotation (deg) の決定
+    // 1. 表情に応じた weight と rotation の決定
     int weight = 100;
     float rotationDeg = 0.0f;
 
@@ -53,19 +53,19 @@ public:
     switch (exp) {
       case Expression::Happy:
         weight = 72;
-        rotationDeg = 15.5f; // eyes.cpp の 1550 (0.1度単位)
+        rotationDeg = 15.5f;
         break;
       case Expression::Angry:
         weight = 70;
-        rotationDeg = 4.5f;  // eyes.cpp の 450
+        rotationDeg = 4.5f;
         break;
       case Expression::Sad:
         weight = 70;
-        rotationDeg = -4.0f; // eyes.cpp の -400
+        rotationDeg = -4.0f;
         break;
       case Expression::Sleepy:
         weight = 35;
-        rotationDeg = -0.5f; // eyes.cpp の -50
+        rotationDeg = -0.5f;
         break;
       case Expression::Doubt:
         weight = 75;
@@ -78,39 +78,18 @@ public:
         break;
     }
 
-    // まばたき（EyeOpenRatio）による上書き処理
+    // まばたき（EyeOpenRatio）
     float openRatio = drawContext->getEyeOpenRatio();
     if (openRatio < 1.0f) {
       weight = (int)(weight * openRatio);
     }
 
-    // 右目の回転角度は反転 (eyes.cpp: setRotation(-rotation))
+    // 右目の回転角度は反転
     if (!isLeft) {
       rotationDeg = -rotationDeg;
     }
 
-    // 2. まぶたのY座標オフセット計算
-    int eyelidOffsetY = -((weight * 32) / 100);
-
-    // 3. カラーパレットの取得
-    uint16_t primaryColor = drawContext->getColorPalette()->get(COLOR_PRIMARY);
-    uint16_t bgColor = drawContext->getColorPalette()->get(COLOR_BACKGROUND);
-
-    // 4. オフスクリーンスプライト (32x32) の生成とパーツ合成
-    M5Canvas eyeSpr(canvas);
-    eyeSpr.createSprite(32, 32);
-    eyeSpr.fillSprite(bgColor);
-
-    // 目（中心16,16 半径16の円）
-    eyeSpr.fillCircle(16, 16, 16, primaryColor);
-
-    // まぶた（上部からの遮蔽マスク）
-    int coverHeight = 32 + eyelidOffsetY;
-    if (coverHeight > 0) {
-      eyeSpr.fillRect(0, 0, 32, coverHeight, bgColor);
-    }
-
-    // 5. 視線（Gaze）オフセット計算
+    // 2. 視線（Gaze）位置
     Gaze gaze = drawContext->getGaze();
     int offsetX = (int)(16.0f * gaze.getHorizontal());
     int offsetY = (int)(16.0f * gaze.getVertical());
@@ -118,9 +97,38 @@ public:
     int cx = rect.getCenterX() + offsetX;
     int cy = rect.getCenterY() + offsetY;
 
-    // 6. 指定のピボット中心で回転描画してメインキャンバスへ転送
-    eyeSpr.pushRotateZoom(canvas, cx, cy, rotationDeg, 1.0f, 1.0f, bgColor);
-    eyeSpr.deleteSprite();
+    uint16_t primaryColor = drawContext->getColorPalette()->get(COLOR_PRIMARY);
+    uint16_t bgColor = drawContext->getColorPalette()->get(COLOR_BACKGROUND);
+
+    // 3. 目（円）を描画
+    canvas->fillCircle(cx, cy, 16, primaryColor);
+
+    // 4. まぶたによる遮蔽カット (weight < 100 の場合)
+    if (weight < 100) {
+      float yOffset = 16.0f - (32.0f * weight / 100.0f);
+
+      float rad = rotationDeg * (3.14159265f / 180.0f);
+      float cosA = cosf(rad);
+      float sinA = sinf(rad);
+
+      // まぶたの基準位置
+      float p0x = cx - yOffset * sinA;
+      float p0y = cy + yOffset * cosA;
+
+      float dx = 40.0f * cosA;
+      float dy = 40.0f * sinA;
+      float ux = -40.0f * sinA;
+      float uy = -40.0f * cosA;
+
+      int x1 = (int)(p0x - dx), y1 = (int)(p0y - dy);
+      int x2 = (int)(p0x + dx), y2 = (int)(p0y + dy);
+      int x3 = (int)(p0x + dx + ux), y3 = (int)(p0y + dy + uy);
+      int x4 = (int)(p0x - dx + ux), y4 = (int)(p0y - dy + uy);
+
+      // 背景色でポリゴン塗りつぶし
+      canvas->fillTriangle(x1, y1, x2, y2, x3, y3, bgColor);
+      canvas->fillTriangle(x1, y1, x3, y3, x4, y4, bgColor);
+    }
   }
 };
 
@@ -130,11 +138,11 @@ public:
   CustomFace()
       : Face(
             new CustomMouth(),
-            new BoundingRect(160, 146), // 口: _mouth_pos(0, 26) -> (160, 146)
+            new BoundingRect(160, 146), // 口
             new CustomEye(false),
-            new BoundingRect(230, 104), // 右目: _eye_pos(70, -16) -> (230, 104)
+            new BoundingRect(230, 104), // 右目 (X=230)
             new CustomEye(true),
-            new BoundingRect(90, 104),  // 左目: _eye_pos(-70, -16) -> (90, 104)
+            new BoundingRect(90, 104),  // 左目 (X=90)
             new BlankDrawable(),
             new BoundingRect(0, 0),     // 眉毛削除
             new BlankDrawable(),
