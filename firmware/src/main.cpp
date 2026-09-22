@@ -197,7 +197,8 @@ void lipSync(void *args)
     float open = (float)level/15000.0;
     avatar->setMouthOpenRatio(open);
     avatar->getGaze(&gazeY, &gazeX);
-    avatar->setRotation(gazeX * 5);
+    //avatar->setRotation(gazeX * 5);
+    avatar->setRotation(0);
     delay(100);
   }
 }
