@@ -39,7 +39,11 @@ public:
 class CustomEye : public Drawable {
 private:
   bool isLeft;
-  float currentRatio = 1.0f; // 描画側でアニメーションを滑らかにするための変数
+
+  // アニメーション制御用の状態変数
+  enum class BlinkState { IDLE, CLOSING, CLOSED, OPENING };
+  BlinkState blinkState = BlinkState::IDLE;
+  float currentRatio = 1.0f; // 1.0 (全開) 〜 0.0 (全閉)
 
 public:
   CustomEye(bool isLeft = true) : isLeft(isLeft) {}
@@ -144,22 +148,40 @@ public:
       canvas->fillTriangle(x1, y1, x3, y3, x4, y4, bgColor);
     }
 
-    // 3. まばたき処理（上まぶた降下の補間処理のみ）
+    // 3. 完走型まばたき処理（上から下へ全閉閉鎖 → 下から上へ全開復帰）
     float targetRatio = drawContext->getEyeOpenRatio();
-    
-    // 標準機能の一瞬の変化を、描画周期に合わせてじわっと追従させる
-    currentRatio += (targetRatio - currentRatio) * 0.2f;
 
-    if (currentRatio < 0.98f) {
-      // 上まぶたのY座標を下ろしていく
-      float eyelidY = (cy - eyeRadius) + (eyeRadius * 2.0f) * (1.0f - currentRatio);
-      
-      // 完全に閉じたときは目を覆い尽くす
-      if (currentRatio <= 0.05f) {
-        eyelidY = cy + eyeRadius + 5.0f;
+    // トリガー検知：標準がまばたき(0.8未満)を要求し、待機中(IDLE)なら開始
+    if (blinkState == BlinkState::IDLE && targetRatio < 0.8f) {
+      blinkState = BlinkState::CLOSING;
+    }
+
+    // 1フレームごとの移動量（★小さくするとゆっくり、大きくすると速くなります）
+    const float step = 0.12f;
+
+    if (blinkState == BlinkState::CLOSING) {
+      currentRatio -= step;
+      if (currentRatio <= 0.0f) {
+        currentRatio = 0.0f;
+        blinkState = BlinkState::CLOSED; // 閉じきり完了
       }
+    } else if (blinkState == BlinkState::CLOSED) {
+      // 完全に消えた状態を1フレーム保持して開き始める
+      blinkState = BlinkState::OPENING;
+    } else if (blinkState == BlinkState::OPENING) {
+      currentRatio += step;
+      if (currentRatio >= 1.0f) {
+        currentRatio = 1.0f;
+        blinkState = BlinkState::IDLE; // 完走して待機状態に戻る
+      }
+    }
 
-      // 上まぶたより上の領域を背景色で塗りつぶす
+    // まぶたによる覆い処理
+    if (currentRatio < 0.99f) {
+      // currentRatio = 1.0 で cy - eyeRadius (目の上端)
+      // currentRatio = 0.0 で cy + eyeRadius + 3.0f (目の下端を超えて完全に消去)
+      float eyelidY = (cy - eyeRadius) + (eyeRadius * 2.0f + 3.0f) * (1.0f - currentRatio);
+
       int topY = cy - 35;
       int h = (int)(eyelidY - topY);
       if (h > 0) {
@@ -168,7 +190,6 @@ public:
     }
   }
 };
-
 // --- レイアウト座標 (Y, X) ---
 class CustomFace : public Face {
 public:
