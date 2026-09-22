@@ -174,11 +174,11 @@ static void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
             }
 			break;
 		case WStype_TEXT:
-			Serial.printf("[WSc] get text: %s\n", payload);
+			//Serial.printf("[WSc] get text: %s\n", payload);
 			//Serial.printf("[WSc] text size: %d\n", strlen((char*)payload));
 			break;
 		case WStype_BIN:
-			Serial.printf("[WSc] get binary length: %u\n", length);
+			//Serial.printf("[WSc] get binary length: %u\n", length);
 			//p_this->hexdump(payload, length);
             //Serial.printf("[WSc] get binary: %s\n", payload);
 
@@ -258,7 +258,7 @@ static void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
                 p_this->webSocket.sendTXT(json);
             }
             else if(!p_this->msgDoc["serverContent"]["turnComplete"].isNull()){
-                Serial.printf("[WSc] turnComplete: %s\n", payload);
+                //Serial.printf("[WSc] turnComplete: %s\n", payload);
 
 #ifndef REALTIME_API_WITH_TTS
                 while (M5.Speaker.isPlaying()) { vTaskDelay(1); }

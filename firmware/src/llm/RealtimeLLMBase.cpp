@@ -228,10 +228,10 @@ void RealtimeLLMBase::hexdump(const void *mem, uint32_t len, uint8_t cols) {
 void RealtimeLLMBase::streamAudioDelta(String& delta)
 {
     int base64Size = delta.length();
-    Serial.printf("audio base64 size: %d byte\n", base64Size);
+    //Serial.printf("audio base64 size: %d byte\n", base64Size);
     uint8_t* buf = audioBuf[nextBufIdx];
     int len = base64_decode(delta.c_str(), base64Size, (char*)buf);
-    Serial.printf("audio pcm16 size: %d byte\n", len);
+    //Serial.printf("audio pcm16 size: %d byte\n", len);
 
     while (M5.Speaker.isPlaying()) { vTaskDelay(1); }
     M5.Speaker.playRaw((int16_t*)buf, len/2, 24000, false);
