@@ -133,16 +133,17 @@ public:
 };
 
 // --- 製品版のレイアウト座標を適用した CustomFace ---
+// ※ BoundingRect(top, left) のため (Y, X) の順で渡します
 class CustomFace : public Face {
 public:
   CustomFace()
       : Face(
             new CustomMouth(),
-            new BoundingRect(160, 146), // 口
+            new BoundingRect(146, 160), // 口: Y=146, X=160
             new CustomEye(false),
-            new BoundingRect(230, 104), // 右目 (X=230)
+            new BoundingRect(104, 230), // 右目: Y=104, X=230
             new CustomEye(true),
-            new BoundingRect(90, 104),  // 左目 (X=90)
+            new BoundingRect(104, 90),  // 左目: Y=104, X=90
             new BlankDrawable(),
             new BoundingRect(0, 0),     // 眉毛削除
             new BlankDrawable(),
