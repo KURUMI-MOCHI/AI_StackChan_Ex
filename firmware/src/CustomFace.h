@@ -34,7 +34,7 @@ public:
   }
 };
 
-// --- 笑顔の下側カット・中間サイズ・視線固定の目パーツ ---
+// --- 笑顔：浅めの斜め45度カット・中間サイズ・視線固定の目パーツ ---
 class CustomEye : public Drawable {
 private:
   bool isLeft;
@@ -43,27 +43,27 @@ public:
   CustomEye(bool isLeft = true) : isLeft(isLeft) {}
 
   void draw(M5Canvas *canvas, BoundingRect rect, DrawContext *drawContext) override {
-    const float eyeRadius = 10.5f; // 公式(8px)と前回(13px)の中間サイズ
+    const float eyeRadius = 10.5f; // 半径10.5px (直径21px)
 
     int weight = 100;
     float rotationDeg = 0.0f;
-    bool cutFromBottom = false; // 下側（口側）を欠けさせるフラグ
+    bool cutFromBottom = false;
 
     Expression exp = drawContext->getExpression();
     switch (exp) {
       case Expression::Happy:
-        weight = 65;
-        rotationDeg = -10.0f;
-        cutFromBottom = true; // ★笑顔: 下側（口側）をカットしてにっこりアーチ（⌒）にする
+        weight = 85;          // ★削る量を少なく（15%だけカット）
+        rotationDeg = -45.0f; // ★斜め45度のカットライン
+        cutFromBottom = true; // 下側（口側）をカット
         break;
       case Expression::Angry:
         weight = 70;
-        rotationDeg = 12.0f;  // 怒り: つり目（上側カット）
+        rotationDeg = 12.0f;  // 怒り: つり目
         cutFromBottom = false;
         break;
       case Expression::Sad:
         weight = 70;
-        rotationDeg = -8.0f;  // 悲しい: タレ目（上側カット）
+        rotationDeg = -8.0f;  // 悲しい: タレ目
         cutFromBottom = false;
         break;
       case Expression::Sleepy:
@@ -112,11 +112,9 @@ public:
       float uDirection;
 
       if (cutFromBottom) {
-        // 下側（口側）を削除（背景色で塗る）
         yOffset = -eyeRadius + visibleHeight;
         uDirection = 1.0f; // 下方向 (+Y) にマスク領域を拡張
       } else {
-        // 上側を削除
         yOffset = eyeRadius - visibleHeight;
         uDirection = -1.0f; // 上方向 (-Y) にマスク領域を拡張
       }
