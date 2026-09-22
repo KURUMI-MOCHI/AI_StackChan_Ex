@@ -156,20 +156,21 @@ public:
       blinkState = BlinkState::CLOSING;
     }
 
-    // 1フレームごとの移動量（★小さくするとゆっくり、大きくすると速くなります）
-    const float step = 0.12f;
+    // ★速度の調整（値を大きくするほど速くなります）
+    const float closeStep = 0.40f; // パッと閉じる（約2.5フレーム）
+    const float openStep  = 0.30f; // スッと開く（約3.3フレーム）
 
     if (blinkState == BlinkState::CLOSING) {
-      currentRatio -= step;
+      currentRatio -= closeStep;
       if (currentRatio <= 0.0f) {
         currentRatio = 0.0f;
         blinkState = BlinkState::CLOSED; // 閉じきり完了
       }
     } else if (blinkState == BlinkState::CLOSED) {
-      // 完全に消えた状態を1フレーム保持して開き始める
+      // 完全に消えた状態からすぐ開き始める
       blinkState = BlinkState::OPENING;
     } else if (blinkState == BlinkState::OPENING) {
-      currentRatio += step;
+      currentRatio += openStep;
       if (currentRatio >= 1.0f) {
         currentRatio = 1.0f;
         blinkState = BlinkState::IDLE; // 完走して待機状態に戻る
