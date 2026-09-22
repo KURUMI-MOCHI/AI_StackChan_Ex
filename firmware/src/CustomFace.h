@@ -12,7 +12,7 @@ public:
   void draw(M5Canvas *canvas, BoundingRect rect, DrawContext *drawContext) override {}
 };
 
-// --- 中間サイズに調整した口パーツ ---
+// --- 口パーツ ---
 class CustomMouth : public Drawable {
 public:
   void draw(M5Canvas *canvas, BoundingRect rect, DrawContext *drawContext) override {
@@ -34,7 +34,7 @@ public:
   }
 };
 
-// --- 笑顔：浅めの斜め45度カット・中間サイズ・視線固定の目パーツ ---
+// --- 正確な直交計算による目パーツ ---
 class CustomEye : public Drawable {
 private:
   bool isLeft;
@@ -45,40 +45,40 @@ public:
   void draw(M5Canvas *canvas, BoundingRect rect, DrawContext *drawContext) override {
     const float eyeRadius = 10.5f; // 半径10.5px (直径21px)
 
-    int weight = 100;
+    float weight = 100.0f;
     float rotationDeg = 0.0f;
     bool cutFromBottom = false;
 
     Expression exp = drawContext->getExpression();
     switch (exp) {
       case Expression::Happy:
-        weight = 85;          // ★削る量を少なく（15%だけカット）
-        rotationDeg = -45.0f; // ★斜め45度のカットライン
+        weight = 80.0f;       // 20%だけ削る（浅めのカット）
+        rotationDeg = -45.0f; // 斜め45度
         cutFromBottom = true; // 下側（口側）をカット
         break;
       case Expression::Angry:
-        weight = 70;
+        weight = 70.0f;
         rotationDeg = 12.0f;  // 怒り: つり目
         cutFromBottom = false;
         break;
       case Expression::Sad:
-        weight = 70;
+        weight = 70.0f;
         rotationDeg = -8.0f;  // 悲しい: タレ目
         cutFromBottom = false;
         break;
       case Expression::Sleepy:
-        weight = 35;
+        weight = 35.0f;
         rotationDeg = 0.0f;
         cutFromBottom = false;
         break;
       case Expression::Doubt:
-        weight = 75;
+        weight = 75.0f;
         rotationDeg = 0.0f;
         cutFromBottom = false;
         break;
       case Expression::Neutral:
       default:
-        weight = 100;
+        weight = 100.0f;
         rotationDeg = 0.0f;
         cutFromBottom = false;
         break;
@@ -87,11 +87,11 @@ public:
     // まばたき（EyeOpenRatio）処理
     float openRatio = drawContext->getEyeOpenRatio();
     if (openRatio < 1.0f) {
-      weight = (int)(weight * openRatio);
-      cutFromBottom = false; // まばたき時は通常通り上まぶたを閉じる
+      weight = weight * openRatio;
+      cutFromBottom = false; // まばたき時は通常通り上まぶたを下ろす
     }
 
-    // 右目の回転角度を反転
+    // 右目の回転角度を反転（左右対称）
     if (!isLeft) {
       rotationDeg = -rotationDeg;
     }
@@ -102,40 +102,56 @@ public:
     uint16_t primaryColor = drawContext->getColorPalette()->get(COLOR_PRIMARY);
     uint16_t bgColor = drawContext->getColorPalette()->get(COLOR_BACKGROUND);
 
-    // 1. 目（円）の描画
+    // 1. 目（黒円）の描画
     canvas->fillCircle(cx, cy, (int)eyeRadius, primaryColor);
 
     // 2. まぶたによる遮蔽カット (weight < 100 の場合)
-    if (weight < 100) {
-      float visibleHeight = (eyeRadius * 2.0f) * ((float)weight / 100.0f);
-      float yOffset;
-      float uDirection;
-
-      if (cutFromBottom) {
-        yOffset = -eyeRadius + visibleHeight;
-        uDirection = 1.0f; // 下方向 (+Y) にマスク領域を拡張
-      } else {
-        yOffset = eyeRadius - visibleHeight;
-        uDirection = -1.0f; // 上方向 (-Y) にマスク領域を拡張
-      }
-
+    if (weight < 99.5f) {
+      float visibleHeight = (eyeRadius * 2.0f) * (weight / 100.0f);
+      
       float rad = rotationDeg * (3.14159265f / 180.0f);
       float cosA = cosf(rad);
       float sinA = sinf(rad);
 
-      float p0x = cx - yOffset * sinA;
-      float p0y = cy + yOffset * cosA;
+      // カットラインの方向ベクトル (d_x, d_y)
+      float dx = cosA;
+      float dy = sinA;
 
-      float dx = 25.0f * cosA;
-      float dy = 25.0f * sinA;
-      float ux = uDirection * 25.0f * sinA;
-      float uy = uDirection * 25.0f * cosA;
+      // 遮蔽マスクの方向ベクトル (nx, ny) ※dに対して正確に90度直交
+      float nx, ny;
+      if (cutFromBottom) {
+        // 下側カット: 基準(rad=0)のとき下方向 (0, 1)
+        nx = -sinA;
+        ny = cosA;
+      } else {
+        // 上側カット: 基準(rad=0)のとき上方向 (0, -1)
+        nx = sinA;
+        ny = -cosA;
+      }
 
-      int x1 = (int)(p0x - dx), y1 = (int)(p0y - dy);
-      int x2 = (int)(p0x + dx), y2 = (int)(p0y + dy);
-      int x3 = (int)(p0x + dx + ux), y3 = (int)(p0y + dy + uy);
-      int x4 = (int)(p0x - dx + ux), y4 = (int)(p0y - dy + uy);
+      // カットラインの中点 p0
+      float shift = eyeRadius - visibleHeight;
+      float p0x = cx - shift * nx;
+      float p0y = cy - shift * ny;
 
+      // マスク用長方形のサイズ（目を完全に覆う大きさ）
+      float L = 30.0f; // カットライン方向の長さ
+      float D = 30.0f; // 塗りつぶす奥行き
+
+      // 覆い隠す長方形の4頂点
+      int x1 = (int)(p0x - L * dx);
+      int y1 = (int)(p0y - L * dy);
+
+      int x2 = (int)(p0x + L * dx);
+      int y2 = (int)(p0y + L * dy);
+
+      int x3 = (int)(p0x + L * dx + D * nx);
+      int y3 = (int)(p0y + L * dy + D * ny);
+
+      int x4 = (int)(p0x - L * dx + D * nx);
+      int y4 = (int)(p0y - L * dy + D * ny);
+
+      // 背景色で塗りつぶして目を正確に欠けさせる
       canvas->fillTriangle(x1, y1, x2, y2, x3, y3, bgColor);
       canvas->fillTriangle(x1, y1, x3, y3, x4, y4, bgColor);
     }
