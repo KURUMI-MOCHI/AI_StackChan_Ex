@@ -35,9 +35,11 @@ public:
 };
 
 // --- 笑顔表示と自然な上まぶた瞬きに対応した目パーツ ---
+// --- 笑顔表示と自然な上まぶた瞬きに対応した目パーツ ---
 class CustomEye : public Drawable {
 private:
   bool isLeft;
+  float currentRatio = 1.0f; // 描画側でアニメーションを滑らかにするための変数
 
 public:
   CustomEye(bool isLeft = true) : isLeft(isLeft) {}
@@ -142,18 +144,22 @@ public:
       canvas->fillTriangle(x1, y1, x3, y3, x4, y4, bgColor);
     }
 
-    // 3. まばたき処理（上まぶたが上からまっすぐ下へ降下する）
-    float openRatio = drawContext->getEyeOpenRatio();
-    if (openRatio < 0.99f) {
-      // 上まぶたのY座標を下ろしていく (openRatio: 1.0 -> 0.0)
-      float eyelidY = (cy - eyeRadius) + (eyeRadius * 2.0f) * (1.0f - openRatio);
+    // 3. まばたき処理（上まぶた降下の補間処理のみ）
+    float targetRatio = drawContext->getEyeOpenRatio();
+    
+    // 標準機能の一瞬の変化を、描画周期に合わせてじわっと追従させる
+    currentRatio += (targetRatio - currentRatio) * 0.2f;
+
+    if (currentRatio < 0.98f) {
+      // 上まぶたのY座標を下ろしていく
+      float eyelidY = (cy - eyeRadius) + (eyeRadius * 2.0f) * (1.0f - currentRatio);
       
-      // ほぼ完全に閉じた時は少し下まで覆い尽くす（完全に消すため）
-      if (openRatio <= 0.02f) {
+      // 完全に閉じたときは目を覆い尽くす
+      if (currentRatio <= 0.05f) {
         eyelidY = cy + eyeRadius + 5.0f;
       }
 
-      // 上まぶたより上の領域を背景色で塗る
+      // 上まぶたより上の領域を背景色で塗りつぶす
       int topY = cy - 35;
       int h = (int)(eyelidY - topY);
       if (h > 0) {
