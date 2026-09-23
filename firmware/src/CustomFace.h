@@ -96,6 +96,7 @@ public:
         weight = 75.0f;
         rotationDeg = 0.0f;
         cutFromBottom = false;
+        LedController.setEmotion(LedEmotion::DOUBT);
         break;
       case Expression::Neutral:
       default:

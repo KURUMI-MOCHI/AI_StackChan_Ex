@@ -38,6 +38,9 @@ void StackChanLED::setEmotion(LedEmotion emotion) {
         case LedEmotion::DOUBT:  // 紫
             _baseR = 150; _baseG = 0; _baseB = 255;
             break;
+        case LedEmotion::SLEEPY:  // 紺
+            _baseR = 75; _baseG = 0; _baseB = 130;
+            break;
     }
 }
 

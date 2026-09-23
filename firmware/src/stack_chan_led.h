@@ -19,7 +19,8 @@ enum class LedEmotion {
     HAPPY,   // 黄緑/黄色 (RGB: 255, 180, 0)
     ANGRY,   // 赤 (RGB: 255, 0, 0)
     SAD,     // 水色/青紫 (RGB: 0, 100, 255)
-    DOUBT    // 紫 (RGB: 180, 0, 255)
+    DOUBT,    // 紫 (RGB: 180, 0, 255)
+    SLEEPY   // 紺 (RGB: 75, 0, 130)
 };
 
 class StackChanLED {
