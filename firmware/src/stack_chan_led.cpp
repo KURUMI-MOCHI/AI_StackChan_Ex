@@ -12,7 +12,10 @@ StackChanLED::StackChanLED()
       _baseR(255), _baseG(60), _baseB(0) {}
 
 void StackChanLED::begin() {
-    Wire.begin();
+    // CoreS3 の内部 I2C バスピン (SDA: 2, SCL: 1)
+    // 送信バッファサイズを 64 バイトに拡張
+    Wire1.setBufferSize(64);
+    Wire1.begin(2, 1, 400000); 
     setEmotion(LedEmotion::NORMAL);
 }
 
@@ -108,12 +111,16 @@ void StackChanLED::update() {
 
 // 本体上部LED（PY32アドレス0x6F）への12個一括RGB送信
 void StackChanLED::writeHardwareLED(uint8_t r, uint8_t g, uint8_t b) {
-    Wire.beginTransmission(PY32_I2C_ADDR);
-    Wire.write(0x00); // レジスタ先頭アドレス
+    Wire1.beginTransmission(PY32_I2C_ADDR);
+    Wire1.write(0x00); // レジスタ先頭アドレス
     for (int i = 0; i < 12; i++) {
-        Wire.write(r);
-        Wire.write(g);
-        Wire.write(b);
+        Wire1.write(r);
+        Wire1.write(g);
+        Wire1.write(b);
     }
-    Wire.endTransmission();
+    uint8_t error = Wire1.endTransmission();
+    if (error != 0) {
+        // デバッグ用: 通信エラー発生時にログ出力
+        // Serial.printf("[LED] I2C Error: %d\n", error);
+    }
 }
