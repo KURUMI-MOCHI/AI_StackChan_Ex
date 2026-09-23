@@ -23,6 +23,7 @@
 #include "mod/QRdisplay/QRdisplayMod.h"
 #include "mod/EspNowRemote/EspNowRemoteMod.h"
 #include "CustomFace.h"
+#include "stack_chan_led.h"
 
 #include "driver/PlayMP3.h"   //lipSync
 #include "driver/TapDetect.h"
@@ -640,6 +641,8 @@ void setup()
 
     time_sync(NTPSRV, GMT_OFFSET, DAYLIGHT_OFFSET);
   }
+  // ★ここに追加：LEDコントローラーの初期化
+  LedController.begin();
 
   mp3_init();
 
@@ -700,6 +703,10 @@ void loop()
 {
   //get_elapsed_time_micro("loop() start");
   M5.update();
+  
+  // ★ここに追加：LEDアニメーションのフレーム更新（1/fゆらぎ・点滅処理等）
+  LedController.update();
+  
   //get_elapsed_time_micro("M5.update time");
   ModBase* mod = get_current_mod();
   if(mod == nullptr){

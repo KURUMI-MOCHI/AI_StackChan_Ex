@@ -3,6 +3,7 @@
 
 #include <Avatar.h>
 #include <cmath>
+#include "stack_chan_led.h"
 
 using namespace m5avatar;
 
@@ -71,21 +72,25 @@ public:
         weight = 80.0f;       // 20%削る（浅めのカット）
         rotationDeg = -45.0f; // 斜め45度
         cutFromBottom = true; // 下側（口側）をカット
+        LedController.setEmotion(LedEmotion::HAPPY); // ※ stack_chan_led.h で定義したインスタンス・関数を呼び出し
         break;
       case Expression::Angry:
         weight = 70.0f;
         rotationDeg = 12.0f;  // 怒り: つり目
         cutFromBottom = false;
+        LedController.setEmotion(LedEmotion::ANGRY);
         break;
       case Expression::Sad:
         weight = 70.0f;
         rotationDeg = -8.0f;  // 悲しい: タレ目
         cutFromBottom = false;
+        LedController.setEmotion(LedEmotion::SAD);
         break;
       case Expression::Sleepy:
         weight = 35.0f;
         rotationDeg = 0.0f;
         cutFromBottom = false;
+        LedController.setEmotion(LedEmotion::SLEEPY);
         break;
       case Expression::Doubt:
         weight = 75.0f;
@@ -97,6 +102,7 @@ public:
         weight = 100.0f;
         rotationDeg = 0.0f;
         cutFromBottom = false;
+        LedController.setEmotion(LedEmotion::NORMAL);
         break;
     }
 

@@ -14,6 +14,7 @@
 #include "MySchedule.h"
 #include "share/SDUtil.h"
 #include "driver/HeadTouchSensor.h"
+#include "stack_chan_led.h" // ★ こちらに変更
 
 using namespace m5avatar;
 
@@ -193,6 +194,7 @@ void RealtimeAiMod::updateHeadTouchExpression(void)
     headTouchHappyUntilMs = millis() + 3000;
     headTouchHappyActive = true;
     avatar.setExpression(Expression::Happy);
+    LedController.setEmotion(LedEmotion::HAPPY); // ★ なでられた時：HAPPY発色
     Serial.printf("[HeadTouch] pet gesture=%s\n", HeadTouchSensor::gestureName(gesture));
   }
 
@@ -204,6 +206,7 @@ void RealtimeAiMod::updateHeadTouchExpression(void)
   if (headTouchHappyActive) {
     headTouchHappyActive = false;
     avatar.setExpression(Expression::Neutral);
+    LedController.setEmotion(LedEmotion::NORMAL); // ★ 復帰時：NORMAL発色
   }
 }
 
@@ -220,8 +223,10 @@ void RealtimeAiMod::toggleRealtimeRecord(void)
 {
   if(pRtLLM->isRealtimeRecording()){
     pRtLLM->stopRealtimeRecord();
+    LedController.setState(LedState::THINKING);  // ★ 録音停止時：処理中（青パルス）
   }else{
     pRtLLM->startRealtimeRecord();
+    LedController.setState(LedState::LISTENING); // ★ 録音開始時：聞き取り中（緑固定）
   }
 }
 

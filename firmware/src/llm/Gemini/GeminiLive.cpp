@@ -17,6 +17,7 @@
 #include <base64.h>
 #include "libb64/cdecode.h"
 #include <WebSocketsClient.h>
+#include "stack_chan_led.h" // ★ こちらに変更
 
 using namespace m5avatar;
 extern Avatar avatar;
@@ -191,6 +192,7 @@ static void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
                 Serial.printf("[WSc] setupComplete\n");
                 //Serial.printf("[WSc] payload: %s\n", payload);
                 avatar.setSpeechText("Please touch");
+                LedController.setState(LedState::STANDBY); // ★ 接続準備完了：スタンバイ（1/fゆらぎ）
 
 #if 0   // for debug (音声の代わりにテキストのプロンプトを入力する)
                 String text_base64;
@@ -214,8 +216,10 @@ static void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
                     M5.Mic.end();
                     M5.Speaker.begin();
                     p_this->speaking = true;
+                    LedController.setState(LedState::SPEAKING); // ★ Gemini発話開始：青固定点灯
 #else
                     p_this->speaking = true;
+                    LedController.setState(LedState::SPEAKING); // ★ Gemini発話開始：青固定点灯
 #endif
                 }
 
@@ -241,6 +245,7 @@ static void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
 #endif
             else if(!p_this->msgDoc["toolCall"]["functionCalls"][0].isNull()){
                 Serial.printf("[WSc] toolCall: %s\n", payload);
+                LedController.setState(LedState::THINKING); // ★ ツール実行・思考中：青パルス点滅
 
                 String name = p_this->msgDoc["toolCall"]["functionCalls"][0]["name"].as<String>();
                 String args = p_this->msgDoc["toolCall"]["functionCalls"][0]["args"].as<String>();
@@ -271,6 +276,7 @@ static void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
                     memset(p_this->audioBuf[i], 0, 100 * 1024);
                 }
                 p_this->speaking = false;
+                LedController.setState(LedState::LISTENING); // ★ 会話終了後：次の聞き取り待ち（緑固定）
 #else
                 p_this->response_done = true;
 #endif
