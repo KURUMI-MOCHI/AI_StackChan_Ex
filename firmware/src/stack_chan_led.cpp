@@ -1,3 +1,4 @@
+#include <M5Unified.h>  // ★ これを追加
 #include "stack_chan_led.h"
 #define PY32_I2C_ADDR 0x6F
 
