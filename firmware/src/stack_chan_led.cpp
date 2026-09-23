@@ -3,11 +3,36 @@
 
 #define PY32_I2C_ADDR 0x6F
 
+// PY32IOExpander レジスタ定義
+static constexpr uint8_t REG_GPIO_M_H   = 0x04;
+static constexpr uint8_t REG_GPIO_PU_H  = 0x0A;
+static constexpr uint8_t REG_GPIO_PD_H  = 0x0C;
+static constexpr uint8_t REG_GPIO_DRV_H = 0x14;
+static constexpr uint8_t REG_LED_CFG    = 0x24;
+static constexpr uint8_t REG_LED_RAM    = 0x30;
+
 StackChanLED LedController;
 
 // 前回の送信値を保持して無駄なI2C通信を防ぐ
 static uint8_t s_lastR = 255, s_lastG = 255, s_lastB = 255;
 static bool s_firstSend = true;
+
+// --- I2C ヘルパー関数 ---
+static bool writeReg8(uint8_t reg, uint8_t val) {
+    return M5.In_I2C.writeRegister8(PY32_I2C_ADDR, reg, val, 400000);
+}
+
+static uint8_t readReg8(uint8_t reg) {
+    return M5.In_I2C.readRegister8(PY32_I2C_ADDR, reg, 400000);
+}
+
+static void bitOn(uint8_t reg, uint8_t mask) {
+    writeReg8(reg, readReg8(reg) | mask);
+}
+
+static void bitOff(uint8_t reg, uint8_t mask) {
+    writeReg8(reg, readReg8(reg) & ~mask);
+}
 
 StackChanLED::StackChanLED()
     : _currentState(LedState::STANDBY),
@@ -17,6 +42,18 @@ StackChanLED::StackChanLED()
       _baseR(255), _baseG(60), _baseB(0) {}
 
 void StackChanLED::begin() {
+    // 1. GPIO 13 (LED信号駆動ピン) の初期化設定
+    uint8_t pin13_mask = (1 << 5);     // ピン13は High Byte の Bit 5 (13 - 8 = 5)
+    bitOn(REG_GPIO_M_H, pin13_mask);   // Direction = Output
+    bitOff(REG_GPIO_PD_H, pin13_mask); // Pull-down OFF
+    bitOn(REG_GPIO_PU_H, pin13_mask);  // Pull-up ON
+    bitOff(REG_GPIO_DRV_H, pin13_mask);// DriveMode = Push-pull
+
+    // 2. LEDの個数を12個に設定
+    writeReg8(REG_LED_CFG, 12);
+
+    delay(200);
+
     setEmotion(LedEmotion::NORMAL);
 }
 
@@ -67,7 +104,7 @@ float StackChanLED::calculate1OverFFlicker() {
 
 void StackChanLED::update() {
     uint32_t now = millis();
-    // 音声処理タスク（I2C）との衝突を防ぐため、書き込み間隔を50ms（毎秒20回）に緩和
+    // 音声処理タスク（I2C）との衝突を防ぐため、書き込み間隔を50msに維持
     if (now - _lastUpdate < 50) {
         return;
     }
@@ -98,23 +135,30 @@ void StackChanLED::update() {
 }
 
 void StackChanLED::writeHardwareLED(uint8_t r, uint8_t g, uint8_t b) {
-    // 初回送信が成功済みで、かつ値が変わっていない場合はスキップ
+    // 初回送信済みで、かつ値が変わっていない場合は通信をスキップ
     if (!s_firstSend && s_lastR == r && s_lastG == g && s_lastB == b) {
         return;
     }
 
-    uint8_t ledData[36];
+    // 1. RGB888 -> RGB565 (16bit) 変換
+    uint16_t color565 = ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
+
+    // 2. 12個分 (24バイト) の RAM データを生成
+    uint8_t ramData[24];
     for (int i = 0; i < 12; i++) {
-        ledData[i * 3 + 0] = r;
-        ledData[i * 3 + 1] = g;
-        ledData[i * 3 + 2] = b;
+        ramData[i * 2 + 0] = color565 & 0xFF;        // Low Byte
+        ramData[i * 2 + 1] = (color565 >> 8) & 0xFF; // High Byte
     }
 
-    // 書き込みが成功した場合のみ送信済みフラグを立てる
-    if (M5.In_I2C.writeRegister(PY32_I2C_ADDR, 0x00, ledData, sizeof(ledData), 400000)) {
+    // 3. REG_LED_RAM (0x30) へデータ一括送信
+    if (M5.In_I2C.writeRegister(PY32_I2C_ADDR, REG_LED_RAM, ramData, sizeof(ramData), 400000)) {
+        // 4. リフレッシュトリガー (REG_LED_CFG の Bit 6 を 1 にセットして物理LEDに描画)
+        uint8_t cfg = readReg8(REG_LED_CFG);
+        writeReg8(REG_LED_CFG, cfg | (1 << 6));
+
         s_lastR = r;
         s_lastG = g;
         s_lastB = b;
-        s_firstSend = false; // 通信成功！
+        s_firstSend = false;
     }
 }

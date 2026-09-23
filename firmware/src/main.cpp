@@ -551,6 +551,10 @@ void setup()
   cfg.serial_baudrate = 115200;
   M5.begin(cfg);
 
+  // ★ 移動先: PY32の電源安定化待ち(100ms)の後、最優先で初期化する
+  delay(100);
+  LedController.begin();
+
 #if defined(ARDUINO_M5STACK_ATOMS3R)
   M5.Lcd.setTextSize(2);
   M5.Lcd.printf("Ver.%s\n", FW_VERSION);
@@ -641,10 +645,6 @@ void setup()
 
     time_sync(NTPSRV, GMT_OFFSET, DAYLIGHT_OFFSET);
   }
-  // ベース基板(PY32L020)の電源が完全に立ち上がるまで100ms待つ
-    delay(100);
-  // ★ここに追加：LEDコントローラーの初期化
-  LedController.begin();
 
   mp3_init();
 
