@@ -98,7 +98,7 @@ void StackChanLED::update() {
 }
 
 void StackChanLED::writeHardwareLED(uint8_t r, uint8_t g, uint8_t b) {
-    // 値に変更がなく、初回送信でもない場合は I2C 通信を行わない（衝突回避）
+    // 初回送信が成功済みで、かつ値が変わっていない場合はスキップ
     if (!s_firstSend && s_lastR == r && s_lastG == g && s_lastB == b) {
         return;
     }
@@ -110,11 +110,11 @@ void StackChanLED::writeHardwareLED(uint8_t r, uint8_t g, uint8_t b) {
         ledData[i * 3 + 2] = b;
     }
 
-    // M5Unified の In_I2C を使用して PY32 (0x6F) のレジスタ 0x00 に送信
+    // 書き込みが成功した場合のみ送信済みフラグを立てる
     if (M5.In_I2C.writeRegister(PY32_I2C_ADDR, 0x00, ledData, sizeof(ledData), 400000)) {
         s_lastR = r;
         s_lastG = g;
         s_lastB = b;
-        s_firstSend = false;
+        s_firstSend = false; // 通信成功！
     }
 }

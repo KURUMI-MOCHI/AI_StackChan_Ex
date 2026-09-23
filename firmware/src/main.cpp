@@ -641,6 +641,8 @@ void setup()
 
     time_sync(NTPSRV, GMT_OFFSET, DAYLIGHT_OFFSET);
   }
+  // ベース基板(PY32L020)の電源が完全に立ち上がるまで100ms待つ
+    delay(100);
   // ★ここに追加：LEDコントローラーの初期化
   LedController.begin();
 
