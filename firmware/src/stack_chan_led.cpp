@@ -1,8 +1,13 @@
-#include <M5Unified.h>  // ★ これを追加
+#include <M5Unified.h>
 #include "stack_chan_led.h"
+
 #define PY32_I2C_ADDR 0x6F
 
 StackChanLED LedController;
+
+// 前回の送信値を保持して無駄なI2C通信を防ぐ
+static uint8_t s_lastR = 255, s_lastG = 255, s_lastB = 255;
+static bool s_firstSend = true;
 
 StackChanLED::StackChanLED()
     : _currentState(LedState::STANDBY),
@@ -12,7 +17,6 @@ StackChanLED::StackChanLED()
       _baseR(255), _baseG(60), _baseB(0) {}
 
 void StackChanLED::begin() {
-    // ★重要: Wire.begin() や Wire1.begin() は絶対に呼ばない（M5.begin() が管理しているため）
     setEmotion(LedEmotion::NORMAL);
 }
 
@@ -38,7 +42,7 @@ void StackChanLED::setEmotion(LedEmotion emotion) {
         case LedEmotion::DOUBT:  // 紫
             _baseR = 150; _baseG = 0; _baseB = 255;
             break;
-        case LedEmotion::SLEEPY: // 紫・紺系
+        case LedEmotion::SLEEPY: // 紺系
             _baseR = 80; _baseG = 0; _baseB = 180;
             break;
     }
@@ -63,7 +67,8 @@ float StackChanLED::calculate1OverFFlicker() {
 
 void StackChanLED::update() {
     uint32_t now = millis();
-    if (now - _lastUpdate < 20) {
+    // 音声処理タスク（I2C）との衝突を防ぐため、書き込み間隔を50ms（毎秒20回）に緩和
+    if (now - _lastUpdate < 50) {
         return;
     }
     _lastUpdate = now;
@@ -78,7 +83,7 @@ void StackChanLED::update() {
             break;
         }
         case LedState::LISTENING:
-            writeHardwareLED(0, 255, 0);
+            writeHardwareLED(0, 255, 0); // 緑
             break;
         case LedState::THINKING: {
             float pulse = (sin(now * 0.008f) + 1.0f) / 2.0f;
@@ -87,19 +92,29 @@ void StackChanLED::update() {
             break;
         }
         case LedState::SPEAKING:
-            writeHardwareLED(0, 0, 255);
+            writeHardwareLED(0, 0, 255); // 青
             break;
     }
 }
 
-// M5CoreS3 の内部 I2C (M5.In_I2C) を使用して安全に書き込む
 void StackChanLED::writeHardwareLED(uint8_t r, uint8_t g, uint8_t b) {
+    // 値に変更がなく、初回送信でもない場合は I2C 通信を行わない（衝突回避）
+    if (!s_firstSend && s_lastR == r && s_lastG == g && s_lastB == b) {
+        return;
+    }
+
     uint8_t ledData[36];
     for (int i = 0; i < 12; i++) {
         ledData[i * 3 + 0] = r;
         ledData[i * 3 + 1] = g;
         ledData[i * 3 + 2] = b;
     }
-    // M5Unifiedの内部I2C制御(M5.In_I2C)を使ってバッファ上限を回避しつつ送信
-    M5.In_I2C.writeRegister(PY32_I2C_ADDR, 0x00, ledData, sizeof(ledData), 400000);
+
+    // M5Unified の In_I2C を使用して PY32 (0x6F) のレジスタ 0x00 に送信
+    if (M5.In_I2C.writeRegister(PY32_I2C_ADDR, 0x00, ledData, sizeof(ledData), 400000)) {
+        s_lastR = r;
+        s_lastG = g;
+        s_lastB = b;
+        s_firstSend = false;
+    }
 }
