@@ -10,9 +10,12 @@
 class RealtimeAiMod: public ModBase{
 private:
     box_t box_servo;
+    box_t box_led;     // ★追加: LED制御用エリア
     box_t box_stt;
     box_t box_BtnA;
     box_t box_BtnC;
+
+    bool led_on = true; // ★追加: LEDのON/OFF記憶用（初期値ON）
 
     String avatarText;
     bool isOffline;

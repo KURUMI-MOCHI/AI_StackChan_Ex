@@ -28,8 +28,9 @@ extern void alarm_tone();
 RealtimeAiMod::RealtimeAiMod(bool _isOffline)
   : isOffline{_isOffline}
 {
-  box_servo.setupBox(80, 120, 80, 80);
-  box_stt.setupBox(0, 0, M5.Display.width(), 60);
+  box_stt.setupBox(0, 0, M5.Display.width(), 60); // 画面上部：会話モード
+  box_servo.setupBox(60, 120, 80, 80);            // 画面中央左：サーボON/OFF
+  box_led.setupBox(180, 120, 80, 80);             // 画面中央右：LED ON/OFF
   box_BtnA.setupBox(0, 100, 40, 60);
   box_BtnC.setupBox(280, 100, 40, 60);
 
@@ -108,20 +109,29 @@ void RealtimeAiMod::display_touched(int16_t x, int16_t y)
     toggleRealtimeRecord();
   }
 #ifdef USE_SERVO
+  // 2. 画面中央左：サーボON/OFF（LEDには影響しない）
   if (box_servo.contain(x, y))
   {
     sw_tone();
-    LedController.flashFeedback(); // ★長めの白2回点滅
+    LedController.flashFeedback();
     servo_home = !servo_home;
-
-    // サーボ停止中は消灯、動作中はスタンバイ（ゆらぎ）
-    if (servo_home) {
-      LedController.setState(LedState::OFF);
-    } else {
-      LedController.setState(LedState::STANDBY);
-    }
   }
 #endif
+
+// 3. 画面中央右：LED ON/OFF（サーボには影響しない）
+  if (box_led.contain(x, y))
+  {
+    sw_tone();
+    LedController.flashFeedback();
+    led_on = !led_on;
+
+    if (led_on) {
+      LedController.setState(LedState::STANDBY);
+    } else {
+      LedController.setState(LedState::OFF);
+    }
+  }
+
   if (box_BtnA.contain(x, y))
   {
     //sw_tone();
@@ -157,7 +167,7 @@ void RealtimeAiMod::idle(void)
   }
 #endif  //REALTIME_API_WITH_TTS
 
-  // ★ 青点滅（THINKING）スタック防止＆待機状態復帰処理
+// ★ 青点滅（THINKING）等の終了後、led_on の状態に合わせてSTANDBYまたはOFFへ復帰
   if (pRtLLM != nullptr) {
     bool isRecording = pRtLLM->isRealtimeRecording();
     
@@ -165,10 +175,10 @@ void RealtimeAiMod::idle(void)
       LedState currentState = LedController.getState();
       
       if (currentState == LedState::THINKING || currentState == LedState::LISTENING) {
-        if (servo_home) {
-          LedController.setState(LedState::OFF);     // サーボ停止中は消灯
+        if (led_on) {
+          LedController.setState(LedState::STANDBY); // LEDがONならゆらぎ点灯
         } else {
-          LedController.setState(LedState::STANDBY); // サーボ動作中はオレンジ
+          LedController.setState(LedState::OFF);     // LEDがOFFなら消灯
         }
       }
     }
