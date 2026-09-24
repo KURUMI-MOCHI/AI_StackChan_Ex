@@ -107,11 +107,16 @@ void RealtimeAiMod::display_touched(int16_t x, int16_t y)
   if (box_servo.contain(x, y))
   {
     sw_tone();
-    // ★追加: LEDが消灯中(OFF)なら、サーボ起動と同時にSTANDBY（点灯）にする
-    if (LedController.getState() == LedState::OFF) {
-        LedController.setState(LedState::STANDBY);
-    }
     servo_home = !servo_home;
+
+    // ★修正: サーボの状態に合わせてLEDのON/OFFを切り替え
+    if (servo_home) {
+      // サーボホーム（停止）時は LED も消灯
+      LedController.setState(LedState::OFF);
+    } else {
+      // サーボ動作時は LED をスタンバイ点灯（オレンジゆらぎ）
+      LedController.setState(LedState::STANDBY);
+    }
   }
 #endif
   if (box_BtnA.contain(x, y))
@@ -137,25 +142,51 @@ void RealtimeAiMod::doubleTapped(float ax, float ay, float az)
 
 void RealtimeAiMod::idle(void)
 {
-#ifdef REALTIME_API_WITH_TTS
+  bool isSpeaking = false;
 
-  // ★【修正】robot と pRtLLM の安全チェックを追加
+#ifdef REALTIME_API_WITH_TTS
   if (robot != nullptr && pRtLLM != nullptr) {
     if(robot->asyncPlaying || (pRtLLM->getOutputTextQueueSize() != 0)){
-      // 発話中
+      isSpeaking = true;
       pRtLLM->setSpeaking(true);
     }
     else{
-      // 発話停止中かつキューにテキストがない場合はLLM機能に発話終了を通知
       pRtLLM->setSpeaking(false);
-      // ★ここに会話終了時のLED復帰処理などを追加できます
-      if (pRtLLM->isRealtimeRecording() == false) {
-        LedController.setState(LedState::STANDBY);
+    }
+  }
+#endif  //REALTIME_API_WITH_TTS
+
+  // ★【修正】録音も発話もしていない待機状態になったら、青点滅（THINKING）や緑（LISTENING）から強制脱出する
+  if (pRtLLM != nullptr) {
+    bool isRecording = pRtLLM->isRealtimeRecording();
+    
+    // 録音中（LISTENING）でもなく、発話中（isSpeaking）でもない場合
+    if (!isRecording && !isSpeaking) {
+      LedState currentState = LedController.getState();
+      
+      // 青点滅または緑点灯のまま残っていれば待機状態へ戻す
+      if (currentState == LedState::THINKING || currentState == LedState::LISTENING) {
+        if (servo_home) {
+          LedController.setState(LedState::OFF);     // サーボ停止中なら消灯
+        } else {
+          LedController.setState(LedState::STANDBY); // サーボ動作中ならオレンジ
+        }
       }
     }
   }
 
-#endif  //REALTIME_API_WITH_TTS
+  // Alarm (Function Calling)
+  alarmEventHandler();
+  updateHeadTouchExpression();
+
+#if 0 
+  //スケジューラ処理
+  if(!isOffline){
+    run_schedule();
+  }
+#endif
+
+}
 
   // Alarm (Function Calling)
   alarmEventHandler();

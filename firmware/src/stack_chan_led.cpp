@@ -163,11 +163,22 @@ void StackChanLED::update() {
     }
 }
 
-// タッチ検出時のフィードバック（一瞬パッと白く光らせて戻す）
+// タッチ検出時のフィードバック（しっかりわかる白2回点滅）
 void StackChanLED::flashFeedback() {
+    // 1回目の発光 (120ms)
     writeHardwareLED(255, 255, 255);
-    delay(40);
-    s_firstSend = true; // 次回の update() で即座に現在の状態の色（またはOFF）へ更新させる
+    delay(120);
+
+    // 一瞬消灯 (80ms)
+    writeHardwareLED(0, 0, 0);
+    delay(80);
+
+    // 2回目の発光 (120ms)
+    writeHardwareLED(255, 255, 255);
+    delay(120);
+
+    // 次回の update() で即座に現在の状態（STANDBYやOFF）へ復帰させる
+    s_firstSend = true;
 }
 
 void StackChanLED::writeHardwareLED(uint8_t r, uint8_t g, uint8_t b) {
