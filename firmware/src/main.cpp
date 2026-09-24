@@ -755,28 +755,27 @@ void loop()
   if (count)
   {
     auto t = M5.Touch.getDetail();
-    if (t.wasPressed())
-    {
-      mod->display_touched(t.x, t.y);
-    }
 
+    // 1. フリック動作の判定（スライドして指を離したとき）
     if (t.wasFlicked())
     {
       int16_t dx = t.distanceX();
       int16_t dy = t.distanceY();
 
-      // detect flick right/left
-      if(abs(dx) >= abs(dy))
+      // 左右方向のフリックを検出
+      if (abs(dx) >= abs(dy))
       {
-        if(dx > 0){
-          //Serial.println("Right flicked");
-          change_mod(true);
-        }
-        else{
-          //Serial.println("Left flicked");
-          change_mod();
+        if (dx > 0) {
+          change_mod(true); // 右フリック（前のModへ）
+        } else {
+          change_mod();     // 左フリック（次のModへ）
         }
       }
+    }
+    // 2. タップ動作の判定（フリックせずに短くタップして指を離したとき）
+    else if (t.wasClicked())
+    {
+      mod->display_touched(t.x, t.y);
     }
   }
 #endif
