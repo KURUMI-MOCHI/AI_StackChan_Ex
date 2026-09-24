@@ -1,7 +1,8 @@
 #include <M5Unified.h>
 #include "stack_chan_led.h"
 
-#define PY32_I2C_ADDR 0x6F
+// アドレスを動的に保持するため変数化（初期値 0x6F）
+static uint8_t g_py32_i2c_addr = 0x6F;
 
 // PY32IOExpander レジスタ定義
 static constexpr uint8_t REG_GPIO_M_H   = 0x04;
@@ -16,17 +17,17 @@ StackChanLED LedController;
 static uint8_t s_lastR = 255, s_lastG = 255, s_lastB = 255;
 static bool s_firstSend = true;
 
-// --- I2C ヘルパー関数 ---
+// --- I2C ヘルパー関数 (100kHzに落として安定化) ---
 static bool writeReg8(uint8_t reg, uint8_t val) {
-    bool res = M5.In_I2C.writeRegister8(PY32_I2C_ADDR, reg, val, 400000);
+    bool res = M5.In_I2C.writeRegister8(g_py32_i2c_addr, reg, val, 100000);
     if (!res) {
-        Serial.printf("[LED_ERR] writeReg8 failed! reg: 0x%02X, val: 0x%02X\n", reg, val);
+        Serial.printf("[LED_ERR] writeReg8 failed! Addr: 0x%02X, reg: 0x%02X, val: 0x%02X\n", g_py32_i2c_addr, reg, val);
     }
     return res;
 }
 
 static uint8_t readReg8(uint8_t reg) {
-    return M5.In_I2C.readRegister8(PY32_I2C_ADDR, reg, 400000);
+    return M5.In_I2C.readRegister8(g_py32_i2c_addr, reg, 100000);
 }
 
 static void bitOn(uint8_t reg, uint8_t mask) {
@@ -47,6 +48,18 @@ StackChanLED::StackChanLED()
 void StackChanLED::begin() {
     Serial.println("[LED] --- Initializing PY32 LED Controller ---");
     
+    // アドレスの自動判定 (0x6F -> 0x71)
+    if (M5.In_I2C.writeRegister8(0x6F, 0x00, 0x00, 100000)) {
+        g_py32_i2c_addr = 0x6F;
+        Serial.println("[LED] Found PY32 at 0x6F");
+    } else if (M5.In_I2C.writeRegister8(0x71, 0x00, 0x00, 100000)) {
+        g_py32_i2c_addr = 0x71;
+        Serial.println("[LED] Found PY32 at 0x71");
+    } else {
+        Serial.println("[LED_ERR] PY32 LED controller not found on In_I2C!");
+        return;
+    }
+
     // I2Cの導通テスト（レジスタ0x00の読み出し）
     uint8_t testVal = readReg8(0x00);
     Serial.printf("[LED] PY32 Ping Test (Reg 0x00): 0x%02X\n", testVal);
@@ -158,8 +171,8 @@ void StackChanLED::writeHardwareLED(uint8_t r, uint8_t g, uint8_t b) {
         ramData[i * 2 + 1] = (color565 >> 8) & 0xFF; // High Byte
     }
 
-    // 3. REG_LED_RAM (0x30) へデータ送信
-    if (M5.In_I2C.writeRegister(PY32_I2C_ADDR, REG_LED_RAM, ramData, sizeof(ramData), 400000)) {
+    // 3. REG_LED_RAM (0x30) へデータ送信 (100kHz)
+    if (M5.In_I2C.writeRegister(g_py32_i2c_addr, REG_LED_RAM, ramData, sizeof(ramData), 100000)) {
         // 4. リフレッシュトリガー (REG_LED_CFG の Bit 6 を 1 にセット)
         uint8_t cfg = readReg8(REG_LED_CFG);
         writeReg8(REG_LED_CFG, cfg | (1 << 6));
@@ -169,6 +182,6 @@ void StackChanLED::writeHardwareLED(uint8_t r, uint8_t g, uint8_t b) {
         s_lastB = b;
         s_firstSend = false;
     } else {
-        Serial.printf("[LED_ERR] RAM Write Failed (Addr: 0x%02X)\n", PY32_I2C_ADDR);
+        Serial.printf("[LED_ERR] RAM Write Failed (Addr: 0x%02X)\n", g_py32_i2c_addr);
     }
 }
