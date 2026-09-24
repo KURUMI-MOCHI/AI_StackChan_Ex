@@ -28,7 +28,7 @@ const int32_t TAB_H = 28;
 const int32_t TAB_GAP = 4;
 const int32_t TAB_W = (STATUS_SUBWINDOW_WIDTH - (TAB_MARGIN_X * 2) - TAB_GAP) / 2;
 
-// 描画用のテキストキャッシュ（Avatarタスクでの重い文字列生成を回避）
+// 描画用のテキストキャッシュ
 static String cached_status_text = "";
 
 void drawTextLines(M5Canvas *spi, const String& text, int32_t x, int32_t y, int32_t lineHeight)
@@ -60,18 +60,27 @@ StatusMonitorMod::StatusMonitorMod(void)
   current_page_no = 0;
 }
 
+// テキストキャッシュの更新のみを行う関数
+void StatusMonitorMod::refreshText()
+{
+  cached_status_text = (current_page_no == 0) ? buildSystemStatus() : buildAiServiceStatus();
+}
+
 void StatusMonitorMod::init(void)
 {
-  // 1. サブウィンドウを有効化（Avatarタスクを止めずに顔描画のみ差し替える）
-  avatar.set_isSubWindowEnable(true);
+  // 1. 最初に使用するテキストを生成
+  refreshText();
 
-  // 2. テキストキャッシュの更新と描画関数の登録
-  update(current_page_no);
+  // 2. サブウィンドウのカスタム描画関数を「1回だけ」セットアップ
+  avatar.updateSubWindowCustom(StatusMonitorMod::drawSubWindow, this, 0, 0, 320, 240);
+
+  // 3. サブウィンドウを有効化
+  avatar.set_isSubWindowEnable(true);
 }
 
 void StatusMonitorMod::pause(void)
 {
-  // 他のModに切り替わる時はサブウィンドウを無効化して顔描画に戻す
+  // モニターから抜ける時はサブウィンドウを無効化（顔描画に戻る）
   avatar.set_isSubWindowEnable(false);
 }
 
@@ -209,31 +218,27 @@ void StatusMonitorMod::drawStatusMonitor(M5Canvas *spi, BoundingRect rect,
   spi->setTextDatum(top_left);
   spi->setTextColor(STATUS_TEXT, TFT_WHITE);
 
-  // Avatarタスクからは事前生成されたキャッシュテキストのみを描画する
+  // 事前に準備しておいたテキストを出力するのみ（超軽量）
   drawTextLines(spi, cached_status_text, bodyX, bodyY, 20);
 }
 
 void StatusMonitorMod::update(int page_no)
 {
-  // メインループ側でテキストを事前に構築してキャッシュする
-  cached_status_text = (page_no == 0) ? buildSystemStatus() : buildAiServiceStatus();
-
-  // サブウィンドウ描画コールバックの更新
-  avatar.updateSubWindowCustom(StatusMonitorMod::drawSubWindow, this, 0, 0, 320, 240);
+  refreshText();
 }
 
 void StatusMonitorMod::btnA_pressed(void)
 {
   current_page_no--;
   if(current_page_no < 0) current_page_no = TAB_COUNT - 1;
-  update(current_page_no);
+  refreshText();
 }
 
 void StatusMonitorMod::btnC_pressed(void)
 {
   current_page_no++;
   if(current_page_no >= TAB_COUNT) current_page_no = 0;
-  update(current_page_no);
+  refreshText();
 }
 
 void StatusMonitorMod::display_touched(int16_t x, int16_t y)
@@ -250,14 +255,14 @@ void StatusMonitorMod::display_touched(int16_t x, int16_t y)
   if (box_TabSystem.contain(x, y))
   {
     current_page_no = 0;
-    update(current_page_no);
+    refreshText();
     return;
   }
 
   if (box_TabAiService.contain(x, y))
   {
     current_page_no = 1;
-    update(current_page_no);
+    refreshText();
     return;
   }
 }
@@ -265,9 +270,9 @@ void StatusMonitorMod::display_touched(int16_t x, int16_t y)
 void StatusMonitorMod::idle(void)
 {
   static uint32_t lastUpdate = 0;
-  // 1000ms（1秒）ごとに情報を更新する
+  // 1000ms（1秒）ごとにデータのみ更新する（描画設定の再登録は行わない）
   if (millis() - lastUpdate > 1000) {
     lastUpdate = millis();
-    update(current_page_no);
+    refreshText();
   }
 }
