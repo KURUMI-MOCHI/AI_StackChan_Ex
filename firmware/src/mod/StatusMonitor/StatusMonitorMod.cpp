@@ -265,5 +265,10 @@ void StatusMonitorMod::display_touched(int16_t x, int16_t y)
 
 void StatusMonitorMod::idle(void)
 {
-  update(current_page_no);
+  static uint32_t lastUpdate = 0;
+  // 1000ms（1秒）ごとに情報を更新する
+  if (millis() - lastUpdate > 1000) {
+    lastUpdate = millis();
+    update(current_page_no);
+  }
 }

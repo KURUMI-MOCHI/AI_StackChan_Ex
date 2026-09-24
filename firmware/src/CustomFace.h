@@ -36,7 +36,6 @@ public:
 };
 
 // --- 笑顔表示と自然な上まぶた瞬きに対応した目パーツ ---
-// --- 笑顔表示と自然な上まぶた瞬きに対応した目パーツ ---
 class CustomEye : public Drawable {
 private:
   bool isLeft;
@@ -45,6 +44,9 @@ private:
   enum class BlinkState { IDLE, CLOSING, CLOSED, OPENING };
   BlinkState blinkState = BlinkState::IDLE;
   float currentRatio = 1.0f; // 1.0 (全開) 〜 0.0 (全閉)
+
+  // 直前の表情を記憶（毎フレームのLED制御呼び出しを防ぐため）
+  Expression lastExp = static_cast<Expression>(-1);
 
 public:
   CustomEye(bool isLeft = true) : isLeft(isLeft) {}
@@ -61,49 +63,58 @@ public:
     // 1. 基本の目（黒円）を描画
     canvas->fillCircle(cx, cy, (int)eyeRadius, primaryColor);
 
+    Expression exp = drawContext->getExpression();
+
+    // ★ 左目の描画時かつ、表情が切り替わった瞬間だけ LED を更新する（重さ・リセット防止）
+    if (isLeft && exp != lastExp) {
+      lastExp = exp;
+      switch (exp) {
+        case Expression::Happy:   LedController.setEmotion(LedEmotion::HAPPY); break;
+        case Expression::Angry:   LedController.setEmotion(LedEmotion::ANGRY); break;
+        case Expression::Sad:     LedController.setEmotion(LedEmotion::SAD); break;
+        case Expression::Sleepy:  LedController.setEmotion(LedEmotion::SLEEPY); break;
+        case Expression::Doubt:   LedController.setEmotion(LedEmotion::DOUBT); break;
+        case Expression::Neutral:
+        default:                  LedController.setEmotion(LedEmotion::NORMAL); break;
+      }
+    }
+
     // 2. 表情パラメータの設定
     float weight = 100.0f;
     float rotationDeg = 0.0f;
     bool cutFromBottom = false;
 
-    Expression exp = drawContext->getExpression();
     switch (exp) {
       case Expression::Happy:
         weight = 80.0f;       // 20%削る（浅めのカット）
         rotationDeg = -45.0f; // 斜め45度
         cutFromBottom = true; // 下側（口側）をカット
-        LedController.setEmotion(LedEmotion::HAPPY); // ※ stack_chan_led.h で定義したインスタンス・関数を呼び出し
         break;
       case Expression::Angry:
         weight = 70.0f;
         rotationDeg = 12.0f;  // 怒り: つり目
         cutFromBottom = false;
-        LedController.setEmotion(LedEmotion::ANGRY);
         break;
       case Expression::Sad:
         weight = 70.0f;
         rotationDeg = -8.0f;  // 悲しい: タレ目
         cutFromBottom = false;
-        LedController.setEmotion(LedEmotion::SAD);
         break;
       case Expression::Sleepy:
         weight = 35.0f;
         rotationDeg = 0.0f;
         cutFromBottom = false;
-        LedController.setEmotion(LedEmotion::SLEEPY);
         break;
       case Expression::Doubt:
         weight = 75.0f;
         rotationDeg = 0.0f;
         cutFromBottom = false;
-        LedController.setEmotion(LedEmotion::DOUBT);
         break;
       case Expression::Neutral:
       default:
         weight = 100.0f;
         rotationDeg = 0.0f;
         cutFromBottom = false;
-        LedController.setEmotion(LedEmotion::NORMAL);
         break;
     }
 
@@ -198,6 +209,7 @@ public:
     }
   }
 };
+
 // --- レイアウト座標 (Y, X) ---
 class CustomFace : public Face {
 public:
