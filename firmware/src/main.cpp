@@ -664,9 +664,9 @@ void setup()
   avatar.setPosition(-56, -96);
   avatar.init();
 #else
-  avatar.init(16);
   customFace = new CustomFace();
   avatar.setFace(customFace);
+  avatar.init(16);
 #endif
 
   if(isConfigPortalMode){
