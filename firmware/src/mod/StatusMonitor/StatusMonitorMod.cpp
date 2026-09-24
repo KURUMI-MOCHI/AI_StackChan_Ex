@@ -59,14 +59,18 @@ StatusMonitorMod::StatusMonitorMod(void)
 
 void StatusMonitorMod::init(void)
 {
-  update(current_page_no);
-  avatar.set_isSubWindowEnable(true);
-}
+  // Avatarの自動描画タスクを一時停止（これで顔の上書き通信が止まります）
+  avatar.setSuspend(true);
+  delay(20);
 
+  // 初回描画
+  update(current_page_no);
+}
 
 void StatusMonitorMod::pause(void)
 {
-  avatar.set_isSubWindowEnable(false);
+  // モニターを抜けて他のModに切り替わる時に、Avatarの描画を再開する
+  avatar.setSuspend(false);
 }
 
 void StatusMonitorMod::drawSubWindow(M5Canvas *spi, BoundingRect rect,
@@ -169,16 +173,10 @@ String StatusMonitorMod::buildAiServiceStatus()
 void StatusMonitorMod::drawStatusMonitor(M5Canvas *spi, BoundingRect rect,
                                          DrawContext *ctx)
 {
-  int32_t x = rect.getLeft();
-  int32_t y = rect.getTop();
-  int32_t w = rect.getWidth();
-  int32_t h = rect.getHeight();
-  if(w <= 0){
-    w = 320;
-  }
-  if(h <= 0){
-    h = 240;
-  }
+  int32_t x = 0;
+  int32_t y = 0;
+  int32_t w = 320;
+  int32_t h = 240;
 
   spi->fillRect(x, y, w, h, STATUS_BG);
   spi->fillRoundRect(x + 2, y + 2, w - 4, h - 4, 6, STATUS_PANEL);
@@ -216,7 +214,16 @@ void StatusMonitorMod::drawStatusMonitor(M5Canvas *spi, BoundingRect rect,
 
 void StatusMonitorMod::update(int page_no)
 {
-  avatar.updateSubWindowCustom(StatusMonitorMod::drawSubWindow, this, 0, 0, 320, 240);
+  // 画面のチラつきを抑えるため、ダブルバッファ（スプライト）を作成して描画
+  M5Canvas canvas(&M5.Display);
+  canvas.createSprite(320, 240);
+
+  BoundingRect rect(0, 0, 320, 240);
+  drawStatusMonitor(&canvas, rect, nullptr);
+
+  // 画面へ一括転送
+  canvas.pushSprite(0, 0);
+  canvas.deleteSprite();
 }
 
 
