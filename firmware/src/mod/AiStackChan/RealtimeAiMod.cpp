@@ -14,10 +14,9 @@
 #include "MySchedule.h"
 #include "share/SDUtil.h"
 #include "driver/HeadTouchSensor.h"
-#include "stack_chan_led.h" // ★ こちらに変更
+#include "stack_chan_led.h"
 
 using namespace m5avatar;
-
 
 /// 外部参照 ///
 extern Avatar avatar;
@@ -25,8 +24,6 @@ extern bool servo_home;
 extern void sw_tone();
 extern void alarm_tone();
 ///////////////
-
-
 
 RealtimeAiMod::RealtimeAiMod(bool _isOffline)
   : isOffline{_isOffline}
@@ -36,7 +33,6 @@ RealtimeAiMod::RealtimeAiMod(bool _isOffline)
   box_BtnA.setupBox(0, 100, 40, 60);
   box_BtnC.setupBox(280, 100, 40, 60);
 
-  // ★【修正】コンストラクタではポインタ保持のみ行い、タスク起動は行わない
   if (robot != nullptr && robot->llm != nullptr) {
     pRtLLM = (RealtimeLLMBase*)robot->llm;
   } else {
@@ -49,7 +45,13 @@ void RealtimeAiMod::init(void)
 {
   avatar.set_isSubWindowEnable(true);
 
-  // ★【修正】安全なタイミングで WebSocket タスクを起動・再開する
+  // ★ 起動時・モード切り替え時にサーボの状態に合わせてLED初期状態を設定
+  if (servo_home) {
+    LedController.setState(LedState::OFF);
+  } else {
+    LedController.setState(LedState::STANDBY);
+  }
+
   if (pRtLLM != nullptr) {
     pRtLLM->invokeWebSocketLoopTask();
   }
@@ -58,9 +60,10 @@ void RealtimeAiMod::init(void)
 void RealtimeAiMod::pause(void)
 {
   avatar.set_isSubWindowEnable(false);
-  pRtLLM->suspendWebSocketLoopTask();
+  if (pRtLLM != nullptr) {
+    pRtLLM->suspendWebSocketLoopTask();
+  }
 }
-
 
 void RealtimeAiMod::update(int page_no)
 {
@@ -101,20 +104,20 @@ void RealtimeAiMod::display_touched(int16_t x, int16_t y)
   if (box_stt.contain(x, y))
   {
     sw_tone();
+    LedController.flashFeedback(); // ★長めの白2回点滅
     toggleRealtimeRecord();
   }
 #ifdef USE_SERVO
   if (box_servo.contain(x, y))
   {
     sw_tone();
+    LedController.flashFeedback(); // ★長めの白2回点滅
     servo_home = !servo_home;
 
-    // ★修正: サーボの状態に合わせてLEDのON/OFFを切り替え
+    // サーボ停止中は消灯、動作中はスタンバイ（ゆらぎ）
     if (servo_home) {
-      // サーボホーム（停止）時は LED も消灯
       LedController.setState(LedState::OFF);
     } else {
-      // サーボ動作時は LED をスタンバイ点灯（オレンジゆらぎ）
       LedController.setState(LedState::STANDBY);
     }
   }
@@ -127,7 +130,6 @@ void RealtimeAiMod::display_touched(int16_t x, int16_t y)
   {
     btnC_pressed();
   }
-
 }
 
 void RealtimeAiMod::doubleTapped(float ax, float ay, float az)
@@ -138,7 +140,6 @@ void RealtimeAiMod::doubleTapped(float ax, float ay, float az)
   toggleRealtimeRecord();
 #endif
 }
-
 
 void RealtimeAiMod::idle(void)
 {
@@ -156,20 +157,18 @@ void RealtimeAiMod::idle(void)
   }
 #endif  //REALTIME_API_WITH_TTS
 
-  // ★【修正】録音も発話もしていない待機状態になったら、青点滅（THINKING）や緑（LISTENING）から強制脱出する
+  // ★ 青点滅（THINKING）スタック防止＆待機状態復帰処理
   if (pRtLLM != nullptr) {
     bool isRecording = pRtLLM->isRealtimeRecording();
     
-    // 録音中（LISTENING）でもなく、発話中（isSpeaking）でもない場合
     if (!isRecording && !isSpeaking) {
       LedState currentState = LedController.getState();
       
-      // 青点滅または緑点灯のまま残っていれば待機状態へ戻す
       if (currentState == LedState::THINKING || currentState == LedState::LISTENING) {
         if (servo_home) {
-          LedController.setState(LedState::OFF);     // サーボ停止中なら消灯
+          LedController.setState(LedState::OFF);     // サーボ停止中は消灯
         } else {
-          LedController.setState(LedState::STANDBY); // サーボ動作中ならオレンジ
+          LedController.setState(LedState::STANDBY); // サーボ動作中はオレンジ
         }
       }
     }
@@ -185,20 +184,6 @@ void RealtimeAiMod::idle(void)
     run_schedule();
   }
 #endif
-
-}
-
-  // Alarm (Function Calling)
-  alarmEventHandler();
-  updateHeadTouchExpression();
-
-#if 0 
-  //スケジューラ処理
-  if(!isOffline){
-    run_schedule();
-  }
-#endif
-
 }
 
 void RealtimeAiMod::alarmEventHandler()
@@ -206,7 +191,6 @@ void RealtimeAiMod::alarmEventHandler()
   if(xAlarmTimer != NULL){
     TickType_t xRemainingTime;
 
-    /* Query the period of the timer that expires. */
     xRemainingTime = xTimerGetExpiryTime( xAlarmTimer ) - xTaskGetTickCount();
     avatarText = "Alarm countdown: " + String(xRemainingTime / 1000);
     avatar.set_isSubWindowEnable(true);
@@ -223,7 +207,6 @@ void RealtimeAiMod::alarmEventHandler()
     alarmTimerCanceled = false;
     avatar.set_isSubWindowEnable(false);
   }
-
 }
 
 void RealtimeAiMod::updateHeadTouchExpression(void)
