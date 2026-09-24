@@ -28,6 +28,9 @@ const int32_t TAB_H = 28;
 const int32_t TAB_GAP = 4;
 const int32_t TAB_W = (STATUS_SUBWINDOW_WIDTH - (TAB_MARGIN_X * 2) - TAB_GAP) / 2;
 
+// 描画用のテキストキャッシュ（Avatarタスクでの重い文字列生成を回避）
+static String cached_status_text = "";
+
 void drawTextLines(M5Canvas *spi, const String& text, int32_t x, int32_t y, int32_t lineHeight)
 {
   int start = 0;
@@ -59,18 +62,17 @@ StatusMonitorMod::StatusMonitorMod(void)
 
 void StatusMonitorMod::init(void)
 {
-  // Avatarの自動描画タスクを一時停止
-  avatar.suspend();
-  delay(20);
+  // 1. サブウィンドウを有効化（Avatarタスクを止めずに顔描画のみ差し替える）
+  avatar.set_isSubWindowEnable(true);
 
-  // 初回描画
+  // 2. テキストキャッシュの更新と描画関数の登録
   update(current_page_no);
 }
 
 void StatusMonitorMod::pause(void)
 {
-  // モニターを抜ける時にAvatarの描画を再開
-  avatar.resume();
+  // 他のModに切り替わる時はサブウィンドウを無効化して顔描画に戻す
+  avatar.set_isSubWindowEnable(false);
 }
 
 void StatusMonitorMod::drawSubWindow(M5Canvas *spi, BoundingRect rect,
@@ -90,23 +92,16 @@ String StatusMonitorMod::buildSystemStatus()
   byte mac[6];
   esp_efuse_mac_get_default(mac);
 
-  //str += "======== System status ========\n";
   sprintf(tmp, "Firmware Version:%s\n", FW_VERSION);
   str += tmp;
   sprintf(tmp, "Wifi:\n  IP addr:%s\n  MAC addr:%02x:%02x:%02x:%02x:%02x:%02x\n",
-                  WiFi.localIP().toString().c_str(),
-                  mac[0], mac[1], mac[2], mac[3], mac[4], mac[5] );
+                 WiFi.localIP().toString().c_str(),
+                 mac[0], mac[1], mac[2], mac[3], mac[4], mac[5] );
   str += tmp;
   sprintf(tmp, "Heap largest free block:\n  DMA:%d\n  SPIRAM:%d\n",
-                  heap_caps_get_largest_free_block(MALLOC_CAP_DMA),
-                  heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM) );
+                 heap_caps_get_largest_free_block(MALLOC_CAP_DMA),
+                 heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM) );
   str += tmp;
-#if 0
-  sprintf(tmp, "Prompt buffer usage:\n  %d / %d [byte]\n",
-                  robot->llm->chat_doc.memoryUsage(),
-                  robot->llm->chat_doc.capacity() );
-  str += tmp;
-#endif
   sprintf(tmp, "Battery level:  %d %%\n", M5.Power.getBatteryLevel());
   str += tmp;
   return str;
@@ -133,7 +128,6 @@ const char* StatusMonitorMod::getAiServiceName(int llm_type)
 String StatusMonitorMod::buildAiServiceStatus()
 {
   String str = "";
-  //str += "========= AI Service ==========\n";
 
   if(robot == nullptr){
     str += "Robot is not initialized.\n";
@@ -173,10 +167,16 @@ String StatusMonitorMod::buildAiServiceStatus()
 void StatusMonitorMod::drawStatusMonitor(M5Canvas *spi, BoundingRect rect,
                                          DrawContext *ctx)
 {
-  int32_t x = 0;
-  int32_t y = 0;
-  int32_t w = 320;
-  int32_t h = 240;
+  int32_t x = rect.getLeft();
+  int32_t y = rect.getTop();
+  int32_t w = rect.getWidth();
+  int32_t h = rect.getHeight();
+  if(w <= 0){
+    w = 320;
+  }
+  if(h <= 0){
+    h = 240;
+  }
 
   spi->fillRect(x, y, w, h, STATUS_BG);
   spi->fillRoundRect(x + 2, y + 2, w - 4, h - 4, 6, STATUS_PANEL);
@@ -208,24 +208,19 @@ void StatusMonitorMod::drawStatusMonitor(M5Canvas *spi, BoundingRect rect,
   spi->fillRect(bodyX - 2, bodyY - 2, bodyW + 4, bodyH + 4, TFT_WHITE);
   spi->setTextDatum(top_left);
   spi->setTextColor(STATUS_TEXT, TFT_WHITE);
-  drawTextLines(spi, current_page_no == 0 ? buildSystemStatus() : buildAiServiceStatus(),
-                bodyX, bodyY, 20);
+
+  // Avatarタスクからは事前生成されたキャッシュテキストのみを描画する
+  drawTextLines(spi, cached_status_text, bodyX, bodyY, 20);
 }
 
 void StatusMonitorMod::update(int page_no)
 {
-  // 画面のチラつきを抑えるため、ダブルバッファ（スプライト）を作成して描画
-  M5Canvas canvas(&M5.Display);
-  canvas.createSprite(320, 240);
+  // メインループ側でテキストを事前に構築してキャッシュする
+  cached_status_text = (page_no == 0) ? buildSystemStatus() : buildAiServiceStatus();
 
-  BoundingRect rect(0, 0, 320, 240);
-  drawStatusMonitor(&canvas, rect, nullptr);
-
-  // 画面へ一括転送
-  canvas.pushSprite(0, 0);
-  canvas.deleteSprite();
+  // サブウィンドウ描画コールバックの更新
+  avatar.updateSubWindowCustom(StatusMonitorMod::drawSubWindow, this, 0, 0, 320, 240);
 }
-
 
 void StatusMonitorMod::btnA_pressed(void)
 {
@@ -243,10 +238,8 @@ void StatusMonitorMod::btnC_pressed(void)
 
 void StatusMonitorMod::display_touched(int16_t x, int16_t y)
 {
-
   if (box_BtnA.contain(x, y))
   {
-
   }
 
   if (box_BtnC.contain(x, y))
@@ -268,7 +261,6 @@ void StatusMonitorMod::display_touched(int16_t x, int16_t y)
     return;
   }
 }
-
 
 void StatusMonitorMod::idle(void)
 {
