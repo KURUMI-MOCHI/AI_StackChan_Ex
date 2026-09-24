@@ -26,6 +26,7 @@
 #include "rootCA/rootCAgoogle.h"       //speechToText
 #include "driver/Audio.h"              //speechToText
 #include "driver/HeadTouchSensor.h"
+#include "stack_chan_led.h"  // ★この行を追加
 
 using namespace m5avatar;
 
