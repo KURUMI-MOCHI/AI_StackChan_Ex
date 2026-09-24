@@ -59,8 +59,8 @@ StatusMonitorMod::StatusMonitorMod(void)
 
 void StatusMonitorMod::init(void)
 {
-  // Avatarの自動描画タスクを一時停止（これで顔の上書き通信が止まります）
-  avatar.setSuspend(true);
+  // Avatarの自動描画タスクを一時停止
+  avatar.suspend();
   delay(20);
 
   // 初回描画
@@ -69,8 +69,8 @@ void StatusMonitorMod::init(void)
 
 void StatusMonitorMod::pause(void)
 {
-  // モニターを抜けて他のModに切り替わる時に、Avatarの描画を再開する
-  avatar.setSuspend(false);
+  // モニターを抜ける時にAvatarの描画を再開
+  avatar.resume();
 }
 
 void StatusMonitorMod::drawSubWindow(M5Canvas *spi, BoundingRect rect,
