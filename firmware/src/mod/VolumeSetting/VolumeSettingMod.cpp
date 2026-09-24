@@ -15,18 +15,6 @@ using namespace m5avatar;
 extern Avatar avatar;
 extern void sw_tone();
 
-///////////////
-
-// ★追加：サブウィンドウに文字を確実に描画する関数（背景：黒 / 文字：白）
-static void drawVolumeTxt(M5Canvas *spi, BoundingRect rect, DrawContext *ctx, void *userData)
-{
-  int vol = *static_cast<int*>(userData);
-  spi->fillScreen(TFT_BLACK);              // 背景を黒で塗る（顔と重なっても消えないようにする）
-  spi->setTextColor(TFT_WHITE, TFT_BLACK);   // 文字色を白に指定
-  spi->setTextSize(2);                     // 文字サイズ
-  spi->drawString("Volume: " + String(vol), 5, 10);
-}
-
 VolumeSettingMod::VolumeSettingMod(void)
 {
   box_BtnA.setupBox(0, 100, 40, 60);
@@ -38,10 +26,9 @@ VolumeSettingMod::VolumeSettingMod(void)
 
 void VolumeSettingMod::init(void)
 {
-  avatar.setSpeechText("Volume Setting");
-  delay(1000);
-  update();
+  avatar.setSpeechText("A:- B:Test C:+");
   avatar.set_isSubWindowEnable(true);
+  update();
 }
 
 void VolumeSettingMod::pause(void)
@@ -51,10 +38,9 @@ void VolumeSettingMod::pause(void)
 
 void VolumeSettingMod::update()
 {
-  avatar.setSpeechText("A:- B:Test C:+");
-
-  // ★修正：updateSubWindowTxt の代わりに updateSubWindowCustom を使い、指定座標(0,0,150,50)に確実に描画
-  avatar.updateSubWindowCustom(drawVolumeTxt, &(robot->spk_volume), 0, 0, 150, 50);
+  // サブウィンドウにボリューム数値を設定
+  String str = " Vol: " + String(robot->spk_volume) + " ";
+  avatar.updateSubWindowTxt(str.c_str());
 }
 
 void VolumeSettingMod::btnA_pressed(void)
@@ -67,7 +53,7 @@ void VolumeSettingMod::btnA_pressed(void)
   }
   M5.Speaker.setVolume(robot->spk_volume);
   sw_tone();
-  update(); // ボタン押下時に画面表示を更新
+  update();
 }
 
 void VolumeSettingMod::btnB_pressed(void)
@@ -85,38 +71,22 @@ void VolumeSettingMod::btnC_pressed(void)
   }
   M5.Speaker.setVolume(robot->spk_volume);
   sw_tone();
-  update(); // ボタン押下時に画面表示を更新
+  update();
 }
 
 void VolumeSettingMod::display_touched(int16_t x, int16_t y)
 {
-  if (box_BtnA.contain(x, y))
-  {
-    btnA_pressed();
-  }
-
-  if (box_BtnB.contain(x, y))
-  {
-    btnB_pressed();
-  }
-
-  if (box_BtnC.contain(x, y))
-  {
-    btnC_pressed();
-  }
-
-  if (box_BtnUA.contain(x, y))
-  {
-
-  }
-
-  if (box_BtnUC.contain(x, y))
-  {
-
-  }
+  if (box_BtnA.contain(x, y)) btnA_pressed();
+  if (box_BtnB.contain(x, y)) btnB_pressed();
+  if (box_BtnC.contain(x, y)) btnC_pressed();
 }
 
 void VolumeSettingMod::idle(void)
 {
-  // 毎フレーム update() を呼ぶとチカチカするため空にしています
+  // ★重要：描画ループに負けないよう、idle() でも定期的に update() を呼んでサブウィンドウを維持する
+  static uint32_t last_update = 0;
+  if (millis() - last_update > 100) { // 100msごとに更新（チラつき防止）
+    update();
+    last_update = millis();
+  }
 }
