@@ -265,10 +265,5 @@ void StatusMonitorMod::display_touched(int16_t x, int16_t y)
 
 void StatusMonitorMod::idle(void)
 {
-  // M5Avatarの画面クリアに負けないよう、定期的にサブウィンドウの描画を更新する
-  static uint32_t last_update = 0;
-  if (millis() - last_update > 200) { // 200ms（毎秒5回）ごとに更新
-    update(current_page_no);
-    last_update = millis();
-  }
+  update(current_page_no);
 }

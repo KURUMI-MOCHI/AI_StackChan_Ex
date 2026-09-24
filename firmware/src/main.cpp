@@ -652,9 +652,6 @@ void setup()
 
   mp3_init();
 
-  // 3. mod（RealtimeAiMod 等）の初期化を「WebSocket接続」より前に行う
-  init_mod();
-
 #if defined(ARDUINO_M5STACK_ATOMS3R)
 #if defined(CAT_FACE)
   customFace = new CatFace();
@@ -668,6 +665,9 @@ void setup()
   avatar.setFace(customFace);
   avatar.init(16);
 #endif
+
+  // 3. mod（RealtimeAiMod 等）の初期化を「WebSocket接続」より前に行う
+  init_mod();
 
   if(isConfigPortalMode){
     show_config_portal_avatar_qr();
