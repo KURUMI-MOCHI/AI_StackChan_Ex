@@ -28,11 +28,6 @@ const int32_t TAB_H = 28;
 const int32_t TAB_GAP = 4;
 const int32_t TAB_W = (STATUS_SUBWINDOW_WIDTH - (TAB_MARGIN_X * 2) - TAB_GAP) / 2;
 
-// モニターの描画制御フラグとインスタンス保持
-static String cached_status_text = "";
-static bool g_isMonitorActive = false;
-static StatusMonitorMod* g_monitorInstance = nullptr;
-
 void drawTextLines(M5Canvas *spi, const String& text, int32_t x, int32_t y, int32_t lineHeight)
 {
   int start = 0;
@@ -51,15 +46,6 @@ void drawTextLines(M5Canvas *spi, const String& text, int32_t x, int32_t y, int3
     start = end + 1;
   }
 }
-
-// Avatarの描画タスク内から顔描画直後に呼ばれるエフェクト関数
-void statusMonitorEffect(M5Canvas *canvas, DrawContext *ctx)
-{
-  if (g_isMonitorActive && g_monitorInstance != nullptr && canvas != nullptr) {
-    BoundingRect rect(0, 0, canvas->width(), canvas->height());
-    g_monitorInstance->drawStatusMonitor(canvas, rect, ctx);
-  }
-}
 }
 
 StatusMonitorMod::StatusMonitorMod(void)
@@ -73,30 +59,23 @@ StatusMonitorMod::StatusMonitorMod(void)
 
 void StatusMonitorMod::init(void)
 {
-  g_monitorInstance = this;
-  g_isMonitorActive = true;
-
-  // 表示用テキストの初回生成
+  current_page_no = 0;
   update(current_page_no);
-
-  // Avatarのエフェクトに描画処理を登録（初回のみ）
-  static bool effectAdded = false;
-  if (!effectAdded) {
-    avatar.addEffect(statusMonitorEffect);
-    effectAdded = true;
-  }
+  avatar.set_isSubWindowEnable(true);
 }
 
 void StatusMonitorMod::pause(void)
 {
-  // モニター表示フラグをオフ（これで顔描画に戻る）
-  g_isMonitorActive = false;
+  avatar.set_isSubWindowEnable(false);
 }
 
 void StatusMonitorMod::drawSubWindow(M5Canvas *spi, BoundingRect rect,
                                      DrawContext *ctx, void *userData)
 {
-  // サブウィンドウ経由ではなくエフェクト経由で描画するため未使用
+  if(userData == nullptr){
+    return;
+  }
+  static_cast<StatusMonitorMod*>(userData)->drawStatusMonitor(spi, rect, ctx);
 }
 
 String StatusMonitorMod::buildSystemStatus()
@@ -193,12 +172,13 @@ void StatusMonitorMod::drawStatusMonitor(M5Canvas *spi, BoundingRect rect,
     h = 240;
   }
 
-  // 背景全体を塗りつぶして顔を完全に隠す
   spi->fillRect(x, y, w, h, STATUS_BG);
   spi->fillRoundRect(x + 2, y + 2, w - 4, h - 4, 6, STATUS_PANEL);
   spi->drawRoundRect(x + 2, y + 2, w - 4, h - 4, 6, STATUS_LINE);
+  
+  // 描画不具合を防ぐためフォントとサイズを安定した値(1)に変更
   spi->setFont(&fonts::Font0);  
-  spi->setTextSize(1.5);
+  spi->setTextSize(1);
 
   const int32_t tabY = y + TAB_Y;
   const int32_t tabH = TAB_H;
@@ -224,15 +204,14 @@ void StatusMonitorMod::drawStatusMonitor(M5Canvas *spi, BoundingRect rect,
   spi->fillRect(bodyX - 2, bodyY - 2, bodyW + 4, bodyH + 4, TFT_WHITE);
   spi->setTextDatum(top_left);
   spi->setTextColor(STATUS_TEXT, TFT_WHITE);
-
-  // 事前に構築しておいたテキストを描画
-  drawTextLines(spi, cached_status_text, bodyX, bodyY, 20);
+  drawTextLines(spi, current_page_no == 0 ? buildSystemStatus() : buildAiServiceStatus(),
+                bodyX, bodyY, 16);
 }
 
 void StatusMonitorMod::update(int page_no)
 {
   current_page_no = page_no;
-  cached_status_text = (current_page_no == 0) ? buildSystemStatus() : buildAiServiceStatus();
+  avatar.updateSubWindowCustom(StatusMonitorMod::drawSubWindow, this, 0, 0, 320, 240);
 }
 
 void StatusMonitorMod::btnA_pressed(void)
@@ -275,10 +254,5 @@ void StatusMonitorMod::display_touched(int16_t x, int16_t y)
 
 void StatusMonitorMod::idle(void)
 {
-  static uint32_t lastUpdate = 0;
-  // 1000ms（1秒）ごとに情報データのみ更新
-  if (millis() - lastUpdate > 1000) {
-    lastUpdate = millis();
-    update(current_page_no);
-  }
+  // Avatarタスクが自動で画面描画を呼び出すため、ここでは何もしなくてOKです
 }

@@ -17,6 +17,16 @@ extern void sw_tone();
 
 ///////////////
 
+// ★追加：サブウィンドウに文字を確実に描画する関数（背景：黒 / 文字：白）
+static void drawVolumeTxt(M5Canvas *spi, BoundingRect rect, DrawContext *ctx, void *userData)
+{
+  int vol = *static_cast<int*>(userData);
+  spi->fillScreen(TFT_BLACK);              // 背景を黒で塗る（顔と重なっても消えないようにする）
+  spi->setTextColor(TFT_WHITE, TFT_BLACK);   // 文字色を白に指定
+  spi->setTextSize(2);                     // 文字サイズ
+  spi->drawString("Volume: " + String(vol), 5, 10);
+}
+
 VolumeSettingMod::VolumeSettingMod(void)
 {
   box_BtnA.setupBox(0, 100, 40, 60);
@@ -24,7 +34,6 @@ VolumeSettingMod::VolumeSettingMod(void)
   box_BtnC.setupBox(280, 100, 40, 60);
   box_BtnUA.setupBox(0, 0, 80, 60);
   box_BtnUC.setupBox(240, 0, 80, 60);
-
 }
 
 void VolumeSettingMod::init(void)
@@ -35,7 +44,6 @@ void VolumeSettingMod::init(void)
   avatar.set_isSubWindowEnable(true);
 }
 
-
 void VolumeSettingMod::pause(void)
 {
   avatar.set_isSubWindowEnable(false);
@@ -43,17 +51,11 @@ void VolumeSettingMod::pause(void)
 
 void VolumeSettingMod::update()
 {
-  String str = "";
-  char tmp[256];
-
   avatar.setSpeechText("A:- B:Test C:+");
 
-  str += "Volume: " + String(robot->spk_volume);
-
-  //M5.Display.print(str);
-  avatar.updateSubWindowTxt(str, 0, 0, 150, 50);
+  // ★修正：updateSubWindowTxt の代わりに updateSubWindowCustom を使い、指定座標(0,0,150,50)に確実に描画
+  avatar.updateSubWindowCustom(drawVolumeTxt, &(robot->spk_volume), 0, 0, 150, 50);
 }
-
 
 void VolumeSettingMod::btnA_pressed(void)
 {
@@ -65,6 +67,7 @@ void VolumeSettingMod::btnA_pressed(void)
   }
   M5.Speaker.setVolume(robot->spk_volume);
   sw_tone();
+  update(); // ボタン押下時に画面表示を更新
 }
 
 void VolumeSettingMod::btnB_pressed(void)
@@ -82,11 +85,11 @@ void VolumeSettingMod::btnC_pressed(void)
   }
   M5.Speaker.setVolume(robot->spk_volume);
   sw_tone();
+  update(); // ボタン押下時に画面表示を更新
 }
 
 void VolumeSettingMod::display_touched(int16_t x, int16_t y)
 {
-
   if (box_BtnA.contain(x, y))
   {
     btnA_pressed();
@@ -113,8 +116,7 @@ void VolumeSettingMod::display_touched(int16_t x, int16_t y)
   }
 }
 
-
 void VolumeSettingMod::idle(void)
 {
-  update();
+  // 毎フレーム update() を呼ぶとチカチカするため空にしています
 }
