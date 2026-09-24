@@ -7,6 +7,7 @@
 
 // LEDの状態定義
 enum class LedState {
+    OFF,        // 追加：消灯状態（起動時など）
     STANDBY,    // 待機中（1/f ゆらぎ発光）
     LISTENING,  // 聞き取り中（緑点灯）
     THINKING,   // 返答準備中（青点滅）
@@ -41,6 +42,12 @@ public:
 
     // カスタムカラーの設定（感情以外の直接指定用）
     void setCustomStandbyColor(uint8_t r, uint8_t g, uint8_t b);
+
+    // 追加：タッチ時などのフラッシュフィードバック
+    void flashFeedback();
+
+    // 追加：現在のLED状態を取得
+    LedState getState() const { return _currentState; }
 
 private:
     LedState _currentState;

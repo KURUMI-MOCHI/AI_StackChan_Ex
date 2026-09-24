@@ -471,6 +471,9 @@ ModBase* init_mod(void)
 
 void sw_tone()
 {
+  // スピーカー音は出さず、LEDを一瞬フラッシュさせてタッチ反応を通知
+    LedController.flashFeedback();
+  /*
   enterMutexAudio();
   M5.Mic.end();
   M5.Speaker.begin();
@@ -481,6 +484,7 @@ void sw_tone()
   M5.Speaker.end();
   M5.Mic.begin();
   exitMutexAudio();
+  */
 }
   
 void alarm_tone()

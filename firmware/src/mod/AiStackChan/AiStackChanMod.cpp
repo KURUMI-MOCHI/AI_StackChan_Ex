@@ -86,6 +86,8 @@ static void STT_ChatGPT(const char *base64_buf = NULL) {
     avatar.setSpeechText("");
     avatar.setExpression(Expression::Neutral);
     servo_home = true;
+    // ★ここに LED を待機状態（STANDBY）に戻す処理を追加できます
+    LedController.setState(LedState::STANDBY);
   } else {
     Serial.println("音声認識失敗");
     avatar.setExpression(Expression::Sad);
@@ -94,6 +96,8 @@ static void STT_ChatGPT(const char *base64_buf = NULL) {
     avatar.setSpeechText("");
     avatar.setExpression(Expression::Neutral);
     servo_home = true;
+    // ★ここにも追加
+    LedController.setState(LedState::STANDBY);
   } 
 }
 

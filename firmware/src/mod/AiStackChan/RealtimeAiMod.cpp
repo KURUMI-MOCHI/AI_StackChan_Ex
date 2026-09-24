@@ -107,6 +107,10 @@ void RealtimeAiMod::display_touched(int16_t x, int16_t y)
   if (box_servo.contain(x, y))
   {
     sw_tone();
+    // ★追加: LEDが消灯中(OFF)なら、サーボ起動と同時にSTANDBY（点灯）にする
+    if (LedController.getState() == LedState::OFF) {
+        LedController.setState(LedState::STANDBY);
+    }
     servo_home = !servo_home;
   }
 #endif
@@ -144,6 +148,10 @@ void RealtimeAiMod::idle(void)
     else{
       // 発話停止中かつキューにテキストがない場合はLLM機能に発話終了を通知
       pRtLLM->setSpeaking(false);
+      // ★ここに会話終了時のLED復帰処理などを追加できます
+      if (pRtLLM->isRealtimeRecording() == false) {
+        LedController.setState(LedState::STANDBY);
+      }
     }
   }
 

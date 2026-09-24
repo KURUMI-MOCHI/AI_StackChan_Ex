@@ -39,7 +39,7 @@ static void bitOff(uint8_t reg, uint8_t mask) {
 }
 
 StackChanLED::StackChanLED()
-    : _currentState(LedState::STANDBY),
+    : _currentState(LedState::OFF), // 初期状態を消灯(OFF)に設定
       _currentEmotion(LedEmotion::NORMAL),
       _lastUpdate(0),
       _flickerPhase(0.0f),
@@ -76,7 +76,10 @@ void StackChanLED::begin() {
 
     delay(200);
 
-    setEmotion(LedEmotion::NORMAL);
+    // 起動直後は前回の残色を消すため、強制的に全消灯
+    writeHardwareLED(0, 0, 0);
+    _currentState = LedState::OFF;
+
     Serial.println("[LED] --- PY32 Initialization Done ---");
 }
 
@@ -133,6 +136,10 @@ void StackChanLED::update() {
     _lastUpdate = now;
 
     switch (_currentState) {
+        case LedState::OFF:
+            writeHardwareLED(0, 0, 0); // 消灯維持
+            break;
+
         case LedState::STANDBY: {
             float factor = calculate1OverFFlicker();
             uint8_t r = static_cast<uint8_t>(_baseR * factor);
@@ -154,6 +161,13 @@ void StackChanLED::update() {
             writeHardwareLED(0, 0, 255); // 青
             break;
     }
+}
+
+// タッチ検出時のフィードバック（一瞬パッと白く光らせて戻す）
+void StackChanLED::flashFeedback() {
+    writeHardwareLED(255, 255, 255);
+    delay(40);
+    s_firstSend = true; // 次回の update() で即座に現在の状態の色（またはOFF）へ更新させる
 }
 
 void StackChanLED::writeHardwareLED(uint8_t r, uint8_t g, uint8_t b) {
