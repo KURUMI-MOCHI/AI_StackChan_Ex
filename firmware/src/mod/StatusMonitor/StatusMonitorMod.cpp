@@ -60,39 +60,6 @@ StatusMonitorMod::StatusMonitorMod(void)
   current_page_no = 0;
 }
 
-// テキストキャッシュの更新のみを行う関数
-void StatusMonitorMod::refreshText()
-{
-  cached_status_text = (current_page_no == 0) ? buildSystemStatus() : buildAiServiceStatus();
-}
-
-void StatusMonitorMod::init(void)
-{
-  // 1. 最初に使用するテキストを生成
-  refreshText();
-
-  // 2. サブウィンドウのカスタム描画関数を「1回だけ」セットアップ
-  avatar.updateSubWindowCustom(StatusMonitorMod::drawSubWindow, this, 0, 0, 320, 240);
-
-  // 3. サブウィンドウを有効化
-  avatar.set_isSubWindowEnable(true);
-}
-
-void StatusMonitorMod::pause(void)
-{
-  // モニターから抜ける時はサブウィンドウを無効化（顔描画に戻る）
-  avatar.set_isSubWindowEnable(false);
-}
-
-void StatusMonitorMod::drawSubWindow(M5Canvas *spi, BoundingRect rect,
-                                     DrawContext *ctx, void *userData)
-{
-  if(userData == nullptr){
-    return;
-  }
-  static_cast<StatusMonitorMod*>(userData)->drawStatusMonitor(spi, rect, ctx);
-}
-
 String StatusMonitorMod::buildSystemStatus()
 {
   String str = "";
@@ -173,6 +140,40 @@ String StatusMonitorMod::buildAiServiceStatus()
   return str;
 }
 
+// 既存の update() 関数内でデータ（文字列）のみを生成して保持する
+void StatusMonitorMod::update(int page_no)
+{
+  current_page_no = page_no;
+  cached_status_text = (current_page_no == 0) ? buildSystemStatus() : buildAiServiceStatus();
+}
+
+void StatusMonitorMod::init(void)
+{
+  // 1. 初回のデータ更新
+  update(current_page_no);
+
+  // 2. カスタムサブウィンドウの描画関数登録を「1回だけ」実行
+  avatar.updateSubWindowCustom(StatusMonitorMod::drawSubWindow, this, 0, 0, 320, 240);
+
+  // 3. サブウィンドウを有効化
+  avatar.set_isSubWindowEnable(true);
+}
+
+void StatusMonitorMod::pause(void)
+{
+  // モニターを抜ける時はサブウィンドウを無効化（顔描画へ戻す）
+  avatar.set_isSubWindowEnable(false);
+}
+
+void StatusMonitorMod::drawSubWindow(M5Canvas *spi, BoundingRect rect,
+                                     DrawContext *ctx, void *userData)
+{
+  if(userData == nullptr){
+    return;
+  }
+  static_cast<StatusMonitorMod*>(userData)->drawStatusMonitor(spi, rect, ctx);
+}
+
 void StatusMonitorMod::drawStatusMonitor(M5Canvas *spi, BoundingRect rect,
                                          DrawContext *ctx)
 {
@@ -218,27 +219,22 @@ void StatusMonitorMod::drawStatusMonitor(M5Canvas *spi, BoundingRect rect,
   spi->setTextDatum(top_left);
   spi->setTextColor(STATUS_TEXT, TFT_WHITE);
 
-  // 事前に準備しておいたテキストを出力するのみ（超軽量）
+  // 事前生成されたテキストのみを描画（Avatarタスクでのスタック溢れを防止）
   drawTextLines(spi, cached_status_text, bodyX, bodyY, 20);
-}
-
-void StatusMonitorMod::update(int page_no)
-{
-  refreshText();
 }
 
 void StatusMonitorMod::btnA_pressed(void)
 {
   current_page_no--;
   if(current_page_no < 0) current_page_no = TAB_COUNT - 1;
-  refreshText();
+  update(current_page_no);
 }
 
 void StatusMonitorMod::btnC_pressed(void)
 {
   current_page_no++;
   if(current_page_no >= TAB_COUNT) current_page_no = 0;
-  refreshText();
+  update(current_page_no);
 }
 
 void StatusMonitorMod::display_touched(int16_t x, int16_t y)
@@ -254,15 +250,13 @@ void StatusMonitorMod::display_touched(int16_t x, int16_t y)
 
   if (box_TabSystem.contain(x, y))
   {
-    current_page_no = 0;
-    refreshText();
+    update(0);
     return;
   }
 
   if (box_TabAiService.contain(x, y))
   {
-    current_page_no = 1;
-    refreshText();
+    update(1);
     return;
   }
 }
@@ -270,9 +264,9 @@ void StatusMonitorMod::display_touched(int16_t x, int16_t y)
 void StatusMonitorMod::idle(void)
 {
   static uint32_t lastUpdate = 0;
-  // 1000ms（1秒）ごとにデータのみ更新する（描画設定の再登録は行わない）
+  // 1000ms（1秒）ごとに表示データのみを更新する
   if (millis() - lastUpdate > 1000) {
     lastUpdate = millis();
-    refreshText();
+    update(current_page_no);
   }
 }
