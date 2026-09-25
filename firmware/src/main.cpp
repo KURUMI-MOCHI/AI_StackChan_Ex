@@ -662,6 +662,8 @@ void setup()
 #if defined(CAT_FACE)
   customFace = new CatFace();
   avatar.setFace(customFace);
+  // ★差し替えたFace（およびSubWindow）のスプライトを初期化する
+  avatar.getFace()->initSprites(1); // カラー深度（通常は1または16）
 #endif
   avatar.setScale(0.5);
   avatar.setPosition(-56, -96);
@@ -669,6 +671,8 @@ void setup()
 #else
   customFace = new CustomFace();
   avatar.setFace(customFace);
+  // ★差し替えたFace（およびSubWindow）のスプライトを初期化する
+  avatar.getFace()->initSprites(1); // カラー深度（通常は1または16）
   avatar.init(16);
 #endif
 

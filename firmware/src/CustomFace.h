@@ -18,12 +18,7 @@ class CustomMouth : public Drawable {
 public:
   void draw(M5Canvas *canvas, BoundingRect rect, DrawContext *drawContext) override {
     float open = drawContext->getMouthOpenRatio(); // 0.0 〜 1.0
-
-    // ★ ヌルチェック追加（タスク死の防止）
-    uint16_t color = TFT_BLACK;
-    if (drawContext && drawContext->getColorPalette()) {
-      color = drawContext->getColorPalette()->get(COLOR_PRIMARY);
-    }
+    uint16_t color = drawContext->getColorPalette()->get(COLOR_PRIMARY);
 
     int w = 60 - (int)(20.0f * open);
     int h = 4 + (int)(28.0f * open);
@@ -40,17 +35,18 @@ public:
   }
 };
 
+// ★ メインタスク側から参照する通信通知変数
 extern LedEmotion pendingLedEmotion; 
 extern bool hasPendingLedEmotion;
 
-// --- 目パーツ ---
+// --- 笑顔表示と自然な上まぶた瞬きに対応した目パーツ ---
 class CustomEye : public Drawable {
 private:
   bool isLeft;
   enum class BlinkState { IDLE, CLOSING, CLOSED, OPENING };
   BlinkState blinkState = BlinkState::IDLE;
   float currentRatio = 1.0f;
-  Expression lastExp = Expression::Neutral; // ★ 初期値を安全なNeutralに変更
+  Expression lastExp = static_cast<Expression>(-1);
 
 public:
   CustomEye(bool isLeft = true) : isLeft(isLeft) {}
@@ -60,21 +56,14 @@ public:
     int cx = rect.getCenterX();
     int cy = rect.getCenterY();
 
-    // ★ ヌルチェック追加
-    uint16_t primaryColor = TFT_BLACK;
-    uint16_t bgColor = TFT_WHITE;
-    if (drawContext && drawContext->getColorPalette()) {
-      primaryColor = drawContext->getColorPalette()->get(COLOR_PRIMARY);
-      bgColor = drawContext->getColorPalette()->get(COLOR_BACKGROUND);
-    }
+    uint16_t primaryColor = drawContext->getColorPalette()->get(COLOR_PRIMARY);
+    uint16_t bgColor = drawContext->getColorPalette()->get(COLOR_BACKGROUND);
 
     canvas->fillCircle(cx, cy, (int)eyeRadius, primaryColor);
 
-    Expression exp = Expression::Neutral;
-    if (drawContext) {
-      exp = drawContext->getExpression();
-    }
+    Expression exp = drawContext->getExpression();
 
+    // ★ 左目かつ表情が変化した瞬間だけ、メインループへ通知を出す
     if (isLeft && exp != lastExp) {
       lastExp = exp;
       switch (exp) {
@@ -89,6 +78,7 @@ public:
       hasPendingLedEmotion = true;
     }
 
+    // 表情パラメータの設定
     float weight = 100.0f;
     float rotationDeg = 0.0f;
     bool cutFromBottom = false;
@@ -170,10 +160,7 @@ public:
     }
 
     // まばたき処理
-    float targetRatio = 1.0f;
-    if (drawContext) {
-      targetRatio = drawContext->getEyeOpenRatio();
-    }
+    float targetRatio = drawContext->getEyeOpenRatio();
 
     if (blinkState == BlinkState::IDLE && targetRatio < 0.8f) {
       blinkState = BlinkState::CLOSING;
@@ -198,12 +185,17 @@ public:
       }
     }
 
+// ★ 修正箇所：塗りつぶし範囲を目（半径10.5px）の領域内に絞る
     if (currentRatio < 0.99f) {
-      float eyelidY = (cy - eyeRadius) + (eyeRadius * 2.0f + 3.0f) * (1.0f - currentRatio);
-      int topY = cy - 35;
-      int h = (int)(eyelidY - topY);
-      if (h > 0) {
-        canvas->fillRect(cx - 25, topY, 50, h, bgColor);
+      // 目の上端から、閉じる割合に応じた高さだけ上まぶたを覆う
+      int fillHeight = (int)((eyeRadius * 2.0f) * (1.0f - currentRatio));
+      if (fillHeight > 0) {
+        int fillX = cx - (int)eyeRadius - 1;
+        int fillY = cy - (int)eyeRadius - 1;
+        int fillW = (int)(eyeRadius * 2.0f) + 2;
+        
+        // 目の領域内だけを背景色で覆う
+        canvas->fillRect(fillX, fillY, fillW, fillHeight, bgColor);
       }
     }
   }
@@ -215,15 +207,15 @@ public:
   CustomFace()
       : Face(
             new CustomMouth(),
-            new BoundingRect(148, 160, 20, 60),  // 口 (top, left, height, width)
+            new BoundingRect(148, 160), // 口
             new CustomEye(false),
-            new BoundingRect(93, 230, 60, 60),   // 右目 (標準サイズを指定)
+            new BoundingRect(106, 225), // 右目
             new CustomEye(true),
-            new BoundingRect(93, 90, 60, 60),    // 左目 (標準サイズを指定)
+            new BoundingRect(106, 95),  // 左目
             new BlankDrawable(),
-            new BoundingRect(67, 192, 20, 60),   // 右眉
+            new BoundingRect(67, 192),  // 眉毛なし（★Y座標を67に設定して吹き出し画面の消滅を防止）
             new BlankDrawable(),
-            new BoundingRect(67, 96, 20, 60)     // 左眉
+            new BoundingRect(67, 96)    // 眉毛なし（★Y座標を67に設定）
         ) {}
 };
 
