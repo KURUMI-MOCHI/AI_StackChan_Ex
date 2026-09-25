@@ -18,7 +18,12 @@ class CustomMouth : public Drawable {
 public:
   void draw(M5Canvas *canvas, BoundingRect rect, DrawContext *drawContext) override {
     float open = drawContext->getMouthOpenRatio(); // 0.0 〜 1.0
-    uint16_t color = drawContext->getColorPalette()->get(COLOR_PRIMARY);
+
+    // ★ ヌルチェック追加（タスク死の防止）
+    uint16_t color = TFT_BLACK;
+    if (drawContext && drawContext->getColorPalette()) {
+      color = drawContext->getColorPalette()->get(COLOR_PRIMARY);
+    }
 
     int w = 60 - (int)(20.0f * open);
     int h = 4 + (int)(28.0f * open);
@@ -35,18 +40,17 @@ public:
   }
 };
 
-// ★ メインタスク側から参照する通信通知変数
 extern LedEmotion pendingLedEmotion; 
 extern bool hasPendingLedEmotion;
 
-// --- 笑顔表示と自然な上まぶた瞬きに対応した目パーツ ---
+// --- 目パーツ ---
 class CustomEye : public Drawable {
 private:
   bool isLeft;
   enum class BlinkState { IDLE, CLOSING, CLOSED, OPENING };
   BlinkState blinkState = BlinkState::IDLE;
   float currentRatio = 1.0f;
-  Expression lastExp = static_cast<Expression>(-1);
+  Expression lastExp = Expression::Neutral; // ★ 初期値を安全なNeutralに変更
 
 public:
   CustomEye(bool isLeft = true) : isLeft(isLeft) {}
@@ -56,14 +60,21 @@ public:
     int cx = rect.getCenterX();
     int cy = rect.getCenterY();
 
-    uint16_t primaryColor = drawContext->getColorPalette()->get(COLOR_PRIMARY);
-    uint16_t bgColor = drawContext->getColorPalette()->get(COLOR_BACKGROUND);
+    // ★ ヌルチェック追加
+    uint16_t primaryColor = TFT_BLACK;
+    uint16_t bgColor = TFT_WHITE;
+    if (drawContext && drawContext->getColorPalette()) {
+      primaryColor = drawContext->getColorPalette()->get(COLOR_PRIMARY);
+      bgColor = drawContext->getColorPalette()->get(COLOR_BACKGROUND);
+    }
 
     canvas->fillCircle(cx, cy, (int)eyeRadius, primaryColor);
 
-    Expression exp = drawContext->getExpression();
+    Expression exp = Expression::Neutral;
+    if (drawContext) {
+      exp = drawContext->getExpression();
+    }
 
-    // ★ 左目かつ表情が変化した瞬間だけ、メインループへ通知を出す
     if (isLeft && exp != lastExp) {
       lastExp = exp;
       switch (exp) {
@@ -78,7 +89,6 @@ public:
       hasPendingLedEmotion = true;
     }
 
-    // 表情パラメータの設定
     float weight = 100.0f;
     float rotationDeg = 0.0f;
     bool cutFromBottom = false;
@@ -160,7 +170,10 @@ public:
     }
 
     // まばたき処理
-    float targetRatio = drawContext->getEyeOpenRatio();
+    float targetRatio = 1.0f;
+    if (drawContext) {
+      targetRatio = drawContext->getEyeOpenRatio();
+    }
 
     if (blinkState == BlinkState::IDLE && targetRatio < 0.8f) {
       blinkState = BlinkState::CLOSING;
@@ -202,15 +215,15 @@ public:
   CustomFace()
       : Face(
             new CustomMouth(),
-            new BoundingRect(148, 160), // 口
+            new BoundingRect(148, 160),
             new CustomEye(false),
-            new BoundingRect(106, 225), // 右目
+            new BoundingRect(106, 225),
             new CustomEye(true),
-            new BoundingRect(106, 95),  // 左目
+            new BoundingRect(106, 95),
             new BlankDrawable(),
-            new BoundingRect(67, 192),  // 眉毛なし（★Y座標を67に設定して吹き出し画面の消滅を防止）
+            new BoundingRect(0, 0),
             new BlankDrawable(),
-            new BoundingRect(67, 96)    // 眉毛なし（★Y座標を67に設定）
+            new BoundingRect(0, 0)
         ) {}
 };
 
