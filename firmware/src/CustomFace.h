@@ -36,47 +36,46 @@ public:
 };
 
 // --- 笑顔表示と自然な上まぶた瞬きに対応した目パーツ ---
+// ★ メインタスク側から参照できるようにリクエスト変数を定義
+extern LedEmotion pendingLedEmotion; 
+extern bool hasPendingLedEmotion;
+
 class CustomEye : public Drawable {
 private:
   bool isLeft;
-
-  // アニメーション制御用の状態変数
   enum class BlinkState { IDLE, CLOSING, CLOSED, OPENING };
   BlinkState blinkState = BlinkState::IDLE;
-  float currentRatio = 1.0f; // 1.0 (全開) 〜 0.0 (全閉)
-
-  // 直前の表情を記憶（毎フレームのLED制御呼び出しを防ぐため）
+  float currentRatio = 1.0f;
   Expression lastExp = static_cast<Expression>(-1);
 
 public:
   CustomEye(bool isLeft = true) : isLeft(isLeft) {}
 
   void draw(M5Canvas *canvas, BoundingRect rect, DrawContext *drawContext) override {
-    const float eyeRadius = 10.5f; // 半径10.5px (直径21px)
-
+    const float eyeRadius = 10.5f;
     int cx = rect.getCenterX();
     int cy = rect.getCenterY();
 
     uint16_t primaryColor = drawContext->getColorPalette()->get(COLOR_PRIMARY);
     uint16_t bgColor = drawContext->getColorPalette()->get(COLOR_BACKGROUND);
 
-    // 1. 基本の目（黒円）を描画
     canvas->fillCircle(cx, cy, (int)eyeRadius, primaryColor);
 
     Expression exp = drawContext->getExpression();
 
-    // ★ 左目の描画時かつ、表情が切り替わった瞬間だけ LED を更新する（重さ・リセット防止）
+    // ★ 直接 LedController を呼ばず、「リクエストフラグ」だけを立てる（タスク競合防止）
     if (isLeft && exp != lastExp) {
       lastExp = exp;
       switch (exp) {
-        case Expression::Happy:   LedController.setEmotion(LedEmotion::HAPPY); break;
-        case Expression::Angry:   LedController.setEmotion(LedEmotion::ANGRY); break;
-        case Expression::Sad:     LedController.setEmotion(LedEmotion::SAD); break;
-        case Expression::Sleepy:  LedController.setEmotion(LedEmotion::SLEEPY); break;
-        case Expression::Doubt:   LedController.setEmotion(LedEmotion::DOUBT); break;
+        case Expression::Happy:   pendingLedEmotion = LedEmotion::HAPPY; break;
+        case Expression::Angry:   pendingLedEmotion = LedEmotion::ANGRY; break;
+        case Expression::Sad:     pendingLedEmotion = LedEmotion::SAD; break;
+        case Expression::Sleepy:  pendingLedEmotion = LedEmotion::SLEEPY; break;
+        case Expression::Doubt:   pendingLedEmotion = LedEmotion::DOUBT; break;
         case Expression::Neutral:
-        default:                  LedController.setEmotion(LedEmotion::NORMAL); break;
+        default:                  pendingLedEmotion = LedEmotion::NORMAL; break;
       }
+      hasPendingLedEmotion = true; // メインタスクへの通知フラグ
     }
 
     // 2. 表情パラメータの設定

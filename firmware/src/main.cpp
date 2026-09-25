@@ -60,6 +60,8 @@ bool isOffline = false;
 bool isWebServerEnabled = false;
 bool isConfigPortalMode = false;
 
+LedEmotion pendingLedEmotion = LedEmotion::NORMAL;
+bool hasPendingLedEmotion = false;
 
 // NTP接続情報　NTP connection information.
 const char* NTPSRV      = "ntp.jst.mfeed.ad.jp";    // NTPサーバーアドレス NTP server address.
@@ -710,8 +712,13 @@ void loop()
   //get_elapsed_time_micro("loop() start");
   M5.update();
   
-  // ★ここに追加：LEDアニメーションのフレーム更新（1/fゆらぎ・点滅処理等）
-  LedController.update();
+ // ★ 描画タスクからLEDの切り替えリクエストが来ていれば、安全なメインタスク側で実行する
+  if (hasPendingLedEmotion) {
+    hasPendingLedEmotion = false;
+    LedController.setEmotion(pendingLedEmotion);
+  }
+
+  LedController.update(); // ゆらぎ処理の更新
   
   //get_elapsed_time_micro("M5.update time");
   ModBase* mod = get_current_mod();
