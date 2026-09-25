@@ -35,11 +35,11 @@ public:
   }
 };
 
-// --- 笑顔表示と自然な上まぶた瞬きに対応した目パーツ ---
-// ★ メインタスク側から参照できるようにリクエスト変数を定義
+// ★ メインタスク側から参照する通信通知変数
 extern LedEmotion pendingLedEmotion; 
 extern bool hasPendingLedEmotion;
 
+// --- 笑顔表示と自然な上まぶた瞬きに対応した目パーツ ---
 class CustomEye : public Drawable {
 private:
   bool isLeft;
@@ -63,7 +63,7 @@ public:
 
     Expression exp = drawContext->getExpression();
 
-    // ★ 直接 LedController を呼ばず、「リクエストフラグ」だけを立てる（タスク競合防止）
+    // ★ 左目かつ表情が変化した瞬間だけ、メインループへ通知を出す
     if (isLeft && exp != lastExp) {
       lastExp = exp;
       switch (exp) {
@@ -75,28 +75,28 @@ public:
         case Expression::Neutral:
         default:                  pendingLedEmotion = LedEmotion::NORMAL; break;
       }
-      hasPendingLedEmotion = true; // メインタスクへの通知フラグ
+      hasPendingLedEmotion = true;
     }
 
-    // 2. 表情パラメータの設定
+    // 表情パラメータの設定
     float weight = 100.0f;
     float rotationDeg = 0.0f;
     bool cutFromBottom = false;
 
     switch (exp) {
       case Expression::Happy:
-        weight = 80.0f;       // 20%削る（浅めのカット）
-        rotationDeg = -45.0f; // 斜め45度
-        cutFromBottom = true; // 下側（口側）をカット
+        weight = 80.0f;
+        rotationDeg = -45.0f;
+        cutFromBottom = true;
         break;
       case Expression::Angry:
         weight = 70.0f;
-        rotationDeg = 12.0f;  // 怒り: つり目
+        rotationDeg = 12.0f;
         cutFromBottom = false;
         break;
       case Expression::Sad:
         weight = 70.0f;
-        rotationDeg = -8.0f;  // 悲しい: タレ目
+        rotationDeg = -8.0f;
         cutFromBottom = false;
         break;
       case Expression::Sleepy:
@@ -117,15 +117,12 @@ public:
         break;
     }
 
-    // 右目の回転角度を反転（左右対称）
     if (!isLeft) {
       rotationDeg = -rotationDeg;
     }
 
-    // 表情によるカット処理 (weight < 100 の場合)
     if (weight < 99.5f) {
       float visibleHeight = (eyeRadius * 2.0f) * (weight / 100.0f);
-      
       float rad = rotationDeg * (3.14159265f / 180.0f);
       float cosA = cosf(rad);
       float sinA = sinf(rad);
@@ -151,13 +148,10 @@ public:
 
       int x1 = (int)(p0x - L * dx);
       int y1 = (int)(p0y - L * dy);
-
       int x2 = (int)(p0x + L * dx);
       int y2 = (int)(p0y + L * dy);
-
       int x3 = (int)(p0x + L * dx + D * nx);
       int y3 = (int)(p0y + L * dy + D * ny);
-
       int x4 = (int)(p0x - L * dx + D * nx);
       int y4 = (int)(p0y - L * dy + D * ny);
 
@@ -165,41 +159,34 @@ public:
       canvas->fillTriangle(x1, y1, x3, y3, x4, y4, bgColor);
     }
 
-    // 3. 完走型まばたき処理（上から下へ全閉閉鎖 → 下から上へ全開復帰）
+    // まばたき処理
     float targetRatio = drawContext->getEyeOpenRatio();
 
-    // トリガー検知：標準がまばたき(0.8未満)を要求し、待機中(IDLE)なら開始
     if (blinkState == BlinkState::IDLE && targetRatio < 0.8f) {
       blinkState = BlinkState::CLOSING;
     }
 
-    // ★速度の調整（値を大きくするほど速くなります）
-    const float closeStep = 0.40f; // パッと閉じる（約2.5フレーム）
-    const float openStep  = 0.30f; // スッと開く（約3.3フレーム）
+    const float closeStep = 0.40f;
+    const float openStep  = 0.30f;
 
     if (blinkState == BlinkState::CLOSING) {
       currentRatio -= closeStep;
       if (currentRatio <= 0.0f) {
         currentRatio = 0.0f;
-        blinkState = BlinkState::CLOSED; // 閉じきり完了
+        blinkState = BlinkState::CLOSED;
       }
     } else if (blinkState == BlinkState::CLOSED) {
-      // 完全に消えた状態からすぐ開き始める
       blinkState = BlinkState::OPENING;
     } else if (blinkState == BlinkState::OPENING) {
       currentRatio += openStep;
       if (currentRatio >= 1.0f) {
         currentRatio = 1.0f;
-        blinkState = BlinkState::IDLE; // 完走して待機状態に戻る
+        blinkState = BlinkState::IDLE;
       }
     }
 
-    // まぶたによる覆い処理
     if (currentRatio < 0.99f) {
-      // currentRatio = 1.0 で cy - eyeRadius (目の上端)
-      // currentRatio = 0.0 で cy + eyeRadius + 3.0f (目の下端を超えて完全に消去)
       float eyelidY = (cy - eyeRadius) + (eyeRadius * 2.0f + 3.0f) * (1.0f - currentRatio);
-
       int topY = cy - 35;
       int h = (int)(eyelidY - topY);
       if (h > 0) {
@@ -209,10 +196,10 @@ public:
   }
 };
 
-// --- レイアウト座標 (Y, X) ---
+// --- レイアウト座標 ---
 class CustomFace : public Face {
 public:
-CustomFace()
+  CustomFace()
       : Face(
             new CustomMouth(),
             new BoundingRect(148, 160), // 口
@@ -221,9 +208,9 @@ CustomFace()
             new CustomEye(true),
             new BoundingRect(106, 95),  // 左目
             new BlankDrawable(),
-            new BoundingRect(67, 192),  // 眉毛なし（Y座標のみダミー設定：右眉）
+            new BoundingRect(67, 192),  // 眉毛なし（★Y座標を67に設定して吹き出し画面の消滅を防止）
             new BlankDrawable(),
-            new BoundingRect(67, 96)    // 眉毛なし（Y座標のみダミー設定：左眉）
+            new BoundingRect(67, 96)    // 眉毛なし（★Y座標を67に設定）
         ) {}
 };
 

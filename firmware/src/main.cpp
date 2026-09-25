@@ -60,8 +60,12 @@ bool isOffline = false;
 bool isWebServerEnabled = false;
 bool isConfigPortalMode = false;
 
+// LED変更の通知用フラグ
 LedEmotion pendingLedEmotion = LedEmotion::NORMAL;
 bool hasPendingLedEmotion = false;
+
+// ★ 現在のLEDの感情状態を記録する変数（二重送信防止用）
+static LedEmotion currentLedEmotion = (LedEmotion)-1;
 
 // NTP接続情報　NTP connection information.
 const char* NTPSRV      = "ntp.jst.mfeed.ad.jp";    // NTPサーバーアドレス NTP server address.
@@ -712,10 +716,15 @@ void loop()
   //get_elapsed_time_micro("loop() start");
   M5.update();
   
- // ★ 描画タスクからLEDの切り替えリクエストが来ていれば、安全なメインタスク側で実行する
+// --- LEDの感情更新（状態変化があった時だけ1回通信する安全ガード付き） ---
   if (hasPendingLedEmotion) {
     hasPendingLedEmotion = false;
-    LedController.setEmotion(pendingLedEmotion);
+    
+    // 現在のLED感情と異なる場合のみ送信（無駄な通信によるフリーズを完全に防止）
+    if (pendingLedEmotion != currentLedEmotion) {
+      currentLedEmotion = pendingLedEmotion;
+      LedController.setEmotion(pendingLedEmotion);
+    }
   }
 
   LedController.update(); // ゆらぎ処理の更新
