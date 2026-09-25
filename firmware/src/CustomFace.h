@@ -215,15 +215,15 @@ public:
   CustomFace()
       : Face(
             new CustomMouth(),
-            new BoundingRect(148, 160),
+            new BoundingRect(148, 160, 20, 60),  // 口 (top, left, height, width)
             new CustomEye(false),
-            new BoundingRect(106, 225),
+            new BoundingRect(93, 230, 60, 60),   // 右目 (標準サイズを指定)
             new CustomEye(true),
-            new BoundingRect(106, 95),
+            new BoundingRect(93, 90, 60, 60),    // 左目 (標準サイズを指定)
             new BlankDrawable(),
-            new BoundingRect(0, 0),
+            new BoundingRect(67, 192, 20, 60),   // 右眉
             new BlankDrawable(),
-            new BoundingRect(0, 0)
+            new BoundingRect(67, 96, 20, 60)     // 左眉
         ) {}
 };
 
