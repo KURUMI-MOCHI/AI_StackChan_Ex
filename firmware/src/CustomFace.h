@@ -212,7 +212,7 @@ public:
 // --- レイアウト座標 (Y, X) ---
 class CustomFace : public Face {
 public:
-  CustomFace()
+CustomFace()
       : Face(
             new CustomMouth(),
             new BoundingRect(148, 160), // 口
@@ -221,9 +221,9 @@ public:
             new CustomEye(true),
             new BoundingRect(106, 95),  // 左目
             new BlankDrawable(),
-            new BoundingRect(0, 0),     // 眉毛なし
+            new BoundingRect(67, 192),  // 眉毛なし（Y座標のみダミー設定：右眉）
             new BlankDrawable(),
-            new BoundingRect(0, 0)      // 眉毛なし
+            new BoundingRect(67, 96)    // 眉毛なし（Y座標のみダミー設定：左眉）
         ) {}
 };
 
