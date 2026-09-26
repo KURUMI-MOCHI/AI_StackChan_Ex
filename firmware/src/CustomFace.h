@@ -11,8 +11,11 @@ using namespace m5avatar;
 // Drawable を継承して型エラーを回避します
 class BlankDrawable : public Drawable {
 public:
-  void draw(M5Canvas *canvas, BoundingRect rect, DrawContext *drawContext) override {
-    // 画面上には何も描画しない
+void draw(M5Canvas *canvas, BoundingRect rect, DrawContext *drawContext) override {
+    // 画面には何も描画しないが、キャンバスの超範囲外に透過ピクセルを描くことで
+    // m5avatar 内部に「パーツを描画した（フレームが更新された）」と判定させ、
+    // 後続の SubWindow (StatusMonitor) の描画コールバックを強制的に起動させる
+    canvas->drawPixel(-1, -1, 0);
   }
 };
 
