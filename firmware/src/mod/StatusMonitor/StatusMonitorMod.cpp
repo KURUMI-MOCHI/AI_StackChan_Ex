@@ -59,7 +59,8 @@ StatusMonitorMod::StatusMonitorMod(void)
 
 void StatusMonitorMod::init(void)
 {
-  Serial.println("[StatusMonitorMod] init called!"); // ★ ログ追加
+  // ★ 既存の吹き出し("please touch")が残っているとSubWindowが描画されないため消去する
+  avatar.setSpeechText("");
   avatar.set_isSubWindowEnable(true);
   update(current_page_no);
 }
@@ -217,8 +218,14 @@ void StatusMonitorMod::drawStatusMonitor(M5Canvas *spi, BoundingRect rect,
 
 void StatusMonitorMod::update(int page_no)
 {
+// Custom SubWindow のコールバックと範囲をセット
   avatar.updateSubWindowCustom(StatusMonitorMod::drawSubWindow, this, 0, 0, 320, 240);
-  avatar.set_isSubWindowEnable(true); // ★ update内でも常に有効化する
+  
+  // ★ 吹き出し文字を空にして優先度をクリアする
+  avatar.setSpeechText(""); 
+
+  // ★ updateSubWindowCustom によってリセットされた描画フラグを最後に確実に有効化する
+  avatar.set_isSubWindowEnable(true);
 }
 
 
