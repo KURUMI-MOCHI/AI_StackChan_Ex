@@ -59,15 +59,22 @@ StatusMonitorMod::StatusMonitorMod(void)
 
 void StatusMonitorMod::init(void)
 {
-  // ★ 既存の吹き出し("please touch")が残っているとSubWindowが描画されないため消去する
-  avatar.setSpeechText("");
+Serial.println("[StatusMonitorMod] init called!");
+  avatar.setSpeechText(""); 
+  
+  // ★重要：ステータスモニター表示中は顔パーツの描画を一時的に無効化（隠す）ことで、
+  // 描画レイヤーの競合を強制的に解消し、SubWindowを全画面に露出させる
+  avatar.set_isFaceEnable(false); // または avatar.setFace(nullptr); 的なアプローチですがまずはフラグで
+
+  avatar.updateSubWindowCustom(StatusMonitorMod::drawSubWindow, this, 0, 0, 320, 240);
   avatar.set_isSubWindowEnable(true);
-  update(current_page_no);
 }
 
 
 void StatusMonitorMod::pause(void)
 {
+// モジュールを抜けるときは顔の描画を元に戻す
+  avatar.set_isFaceEnable(true);
   avatar.set_isSubWindowEnable(false);
 }
 
