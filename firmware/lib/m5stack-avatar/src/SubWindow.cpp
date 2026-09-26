@@ -87,7 +87,9 @@ void SubWindow::pushSpriteTxt(M5Canvas *spi, BoundingRect rect, DrawContext *ctx
 }
 
 void SubWindow::draw(M5Canvas *spi, BoundingRect rect, DrawContext *ctx) {
- 
+ // ★ ここに追加（先頭の // を外して有効化）
+  Serial.printf("SubWindow::draw - isDrawEnable:%d, drawType:%d\n", isDrawEnable, drawType);
+
   if(isDrawEnable){
     if(drawType == SUB_DRAW_TYPE_CAM565){
       int x = rect.getLeft();
