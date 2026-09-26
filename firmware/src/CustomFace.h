@@ -8,9 +8,15 @@
 using namespace m5avatar;
 
 // --- 描画を行わないダミーパーツ（眉毛消去用） ---
-class BlankDrawable : public Drawable {
+class BlankDrawable : public Eyebrow {
 public:
-  void draw(M5Canvas *canvas, BoundingRect rect, DrawContext *drawContext) override {}
+  BlankDrawable() : Eyebrow(0, 0, false) {}
+
+  void draw(M5Canvas *canvas, BoundingRect rect, DrawContext *drawContext) override {
+    // 眉毛自体のグラフィックは描画せず、親クラス(Eyebrow)の処理を通すことで
+    // 後続の SubWindow や吹き出しの描画処理を生かす
+    Eyebrow::draw(canvas, rect, drawContext);
+  }
 };
 
 // --- 口パーツ ---
