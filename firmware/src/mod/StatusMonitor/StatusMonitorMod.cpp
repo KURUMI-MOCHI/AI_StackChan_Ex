@@ -61,13 +61,7 @@ void StatusMonitorMod::init(void)
 {
 Serial.println("[StatusMonitorMod] init called!");
   avatar.setSpeechText(""); 
-  
-  // ★重要：ステータスモニター表示中は顔パーツの描画を一時的に無効化（隠す）ことで、
-  // 描画レイヤーの競合を強制的に解消し、SubWindowを全画面に露出させる
-  avatar.set_isFaceEnable(false); // または avatar.setFace(nullptr); 的なアプローチですがまずはフラグで
-
-  avatar.updateSubWindowCustom(StatusMonitorMod::drawSubWindow, this, 0, 0, 320, 240);
-  avatar.set_isSubWindowEnable(true);
+  update(current_page_no);
 }
 
 
@@ -178,6 +172,8 @@ String StatusMonitorMod::buildAiServiceStatus()
 void StatusMonitorMod::drawStatusMonitor(M5Canvas *spi, BoundingRect rect,
                                          DrawContext *ctx)
 {
+spi->fillRect(0, 0, 320, 240, STATUS_BG);
+
   int32_t x = rect.getLeft();
   int32_t y = rect.getTop();
   int32_t w = rect.getWidth();
@@ -225,13 +221,8 @@ void StatusMonitorMod::drawStatusMonitor(M5Canvas *spi, BoundingRect rect,
 
 void StatusMonitorMod::update(int page_no)
 {
-// Custom SubWindow のコールバックと範囲をセット
-  avatar.updateSubWindowCustom(StatusMonitorMod::drawSubWindow, this, 0, 0, 320, 240);
-  
-  // ★ 吹き出し文字を空にして優先度をクリアする
+  avatar.updateSubWindowCustom(StatusMonitorMod::drawStatusMonitor, this, 0, 0, 320, 240);
   avatar.setSpeechText(""); 
-
-  // ★ updateSubWindowCustom によってリセットされた描画フラグを最後に確実に有効化する
   avatar.set_isSubWindowEnable(true);
 }
 
