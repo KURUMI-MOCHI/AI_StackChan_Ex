@@ -8,14 +8,11 @@
 using namespace m5avatar;
 
 // --- 描画を行わないダミーパーツ（眉毛消去用） ---
-class BlankDrawable : public Eyebrow {
+// Drawable を継承して型エラーを回避します
+class BlankDrawable : public Drawable {
 public:
-  BlankDrawable() : Eyebrow(0, 0, false) {}
-
   void draw(M5Canvas *canvas, BoundingRect rect, DrawContext *drawContext) override {
-    // 眉毛自体のグラフィックは描画せず、親クラス(Eyebrow)の処理を通すことで
-    // 後続の SubWindow や吹き出しの描画処理を生かす
-    Eyebrow::draw(canvas, rect, drawContext);
+    // 画面上には何も描画しない
   }
 };
 
@@ -191,16 +188,14 @@ public:
       }
     }
 
-// ★ 修正箇所：塗りつぶし範囲を目（半径10.5px）の領域内に絞る
+    // 塗りつぶし範囲を目（半径10.5px）の領域内に絞る
     if (currentRatio < 0.99f) {
-      // 目の上端から、閉じる割合に応じた高さだけ上まぶたを覆う
       int fillHeight = (int)((eyeRadius * 2.0f) * (1.0f - currentRatio));
       if (fillHeight > 0) {
         int fillX = cx - (int)eyeRadius - 1;
         int fillY = cy - (int)eyeRadius - 1;
         int fillW = (int)(eyeRadius * 2.0f) + 2;
         
-        // 目の領域内だけを背景色で覆う
         canvas->fillRect(fillX, fillY, fillW, fillHeight, bgColor);
       }
     }
@@ -219,9 +214,9 @@ public:
             new CustomEye(true),
             new BoundingRect(106, 95),  // 左目
             new BlankDrawable(),
-            new BoundingRect(67, 192),  // 眉毛なし（★Y座標を67に設定して吹き出し画面の消滅を防止）
+            new BoundingRect(67, 192),  // 眉毛なし
             new BlankDrawable(),
-            new BoundingRect(67, 96)    // 眉毛なし（★Y座標を67に設定）
+            new BoundingRect(67, 96)    // 眉毛なし
         ) {}
 };
 
