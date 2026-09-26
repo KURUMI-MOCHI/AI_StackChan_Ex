@@ -59,8 +59,9 @@ StatusMonitorMod::StatusMonitorMod(void)
 
 void StatusMonitorMod::init(void)
 {
-  update(current_page_no);
+  Serial.println("[StatusMonitorMod] init called!"); // ★ ログ追加
   avatar.set_isSubWindowEnable(true);
+  update(current_page_no);
 }
 
 
@@ -103,8 +104,8 @@ String StatusMonitorMod::buildSystemStatus()
                   robot->llm->chat_doc.capacity() );
   str += tmp;
 #endif
-  sprintf(tmp, "Battery level:  %d %%\n", M5.Power.getBatteryLevel());
-  str += tmp;
+  //sprintf(tmp, "Battery level:  %d %%\n", M5.Power.getBatteryLevel());
+  //str += tmp;
   return str;
 }
 
@@ -217,6 +218,7 @@ void StatusMonitorMod::drawStatusMonitor(M5Canvas *spi, BoundingRect rect,
 void StatusMonitorMod::update(int page_no)
 {
   avatar.updateSubWindowCustom(StatusMonitorMod::drawSubWindow, this, 0, 0, 320, 240);
+  avatar.set_isSubWindowEnable(true); // ★ update内でも常に有効化する
 }
 
 
