@@ -39,6 +39,7 @@
 #include "llm/Gemini/GeminiLive.h"
 
 #include "WebAPI.h"
+#include "stack_chan_led.h"  // ← 追加
 
 #if defined( ENABLE_CAMERA )
 #include "driver/Camera.h"
@@ -455,36 +456,14 @@ ModBase* init_mod(void)
 
 void sw_tone()
 {
-  enterMutexAudio();
-  M5.Mic.end();
-  M5.Speaker.begin();
-  delay(300);     // AtomS3Rはこのdelayがないと鳴らないときがある
-  M5.Speaker.tone(1000, 100);
-  delay(500);
-
-  M5.Speaker.end();
-  M5.Mic.begin();
-  exitMutexAudio();
+  // ビープ音の代わりにLEDフラッシュを呼び出し（完全ノンブロッキング）
+  LedController.flashFeedback();
 }
   
 void alarm_tone()
 {
-  enterMutexAudio();
-  M5.Mic.end();
-  M5.Speaker.begin();
-
-  for(int i=0; i<5; i++){
-    M5.Speaker.tone(1200, 50);
-    delay(100);
-    M5.Speaker.tone(1200, 50);
-    delay(100);
-    M5.Speaker.tone(1200, 50);
-    delay(1000);  
-  }
-
-  M5.Speaker.end();
-  M5.Mic.begin();
-  exitMutexAudio();
+  // アラーム時もLEDフラッシュを実行
+  LedController.flashFeedback();
 }
 
 void init_mic_spk()
@@ -544,6 +523,10 @@ void setup()
 #endif
   cfg.serial_baudrate = 115200;   //M5Unified 0.1.17からデフォルトが0になったため設定
   M5.begin(cfg);
+
+  // LEDコントローラーの初期化（追加）
+  LedController.begin();
+  LedController.setState(LedState::STANDBY); // 待機モード（1/f ゆらぎ開始）
 
   ///// Debug /////
   //ヒープメモリ残量確認(デバッグ用)
@@ -736,6 +719,8 @@ void loop()
 {
   //get_elapsed_time_micro("loop() start");
   M5.update();
+  // LEDの定期更新処理（追加）
+  LedController.update();
   //get_elapsed_time_micro("M5.update time");
   ModBase* mod = get_current_mod();
   if(mod == nullptr){
