@@ -14,9 +14,9 @@
 #include "MySchedule.h"
 #include "share/SDUtil.h"
 #include "driver/HeadTouchSensor.h"
+#include "stack_chan_led.h"
 
 using namespace m5avatar;
-
 
 /// 外部参照 ///
 extern Avatar avatar;
@@ -25,43 +25,46 @@ extern void sw_tone();
 extern void alarm_tone();
 ///////////////
 
-
-
 RealtimeAiMod::RealtimeAiMod(bool _isOffline)
   : isOffline{_isOffline}
 {
-  box_servo.setupBox(80, 120, 80, 80);
-  box_stt.setupBox(0, 0, M5.Display.width(), 60);
+  box_stt.setupBox(0, 0, M5.Display.width(), 60); // 画面上部：会話モード
+  box_servo.setupBox(60, 120, 80, 80);            // 画面中央左：サーボON/OFF
+  box_led.setupBox(180, 120, 80, 80);             // 画面中央右：LED ON/OFF
   box_BtnA.setupBox(0, 100, 40, 60);
   box_BtnC.setupBox(280, 100, 40, 60);
 
-  pRtLLM = (RealtimeLLMBase*)robot->llm;
-  pRtLLM->invokeWebSocketLoopTask();
-
-  //servo_home = false;
-
-#if 0
-  if(!isOffline){
-    //スケジューラ設定
-    init_schedule();
+  if (robot != nullptr && robot->llm != nullptr) {
+    pRtLLM = (RealtimeLLMBase*)robot->llm;
+  } else {
+    pRtLLM = nullptr;
+    Serial.println("[Warning] robot or robot->llm is null in RealtimeAiMod constructor!");
   }
-#endif
 }
-
 
 void RealtimeAiMod::init(void)
 {
-  //avatar.setSpeechText("Realtime AI");
   avatar.set_isSubWindowEnable(true);
-  pRtLLM->resumeWebSocketLoopTask();
+
+  // ★ 起動時・モード切り替え時にサーボの状態に合わせてLED初期状態を設定
+  if (servo_home) {
+    LedController.setState(LedState::OFF);
+  } else {
+    LedController.setState(LedState::STANDBY);
+  }
+
+  if (pRtLLM != nullptr) {
+    pRtLLM->invokeWebSocketLoopTask();
+  }
 }
 
 void RealtimeAiMod::pause(void)
 {
   avatar.set_isSubWindowEnable(false);
-  pRtLLM->suspendWebSocketLoopTask();
+  if (pRtLLM != nullptr) {
+    pRtLLM->suspendWebSocketLoopTask();
+  }
 }
-
 
 void RealtimeAiMod::update(int page_no)
 {
@@ -102,15 +105,33 @@ void RealtimeAiMod::display_touched(int16_t x, int16_t y)
   if (box_stt.contain(x, y))
   {
     sw_tone();
+    LedController.flashFeedback(); // ★長めの白2回点滅
     toggleRealtimeRecord();
   }
 #ifdef USE_SERVO
+  // 2. 画面中央左：サーボON/OFF（LEDには影響しない）
   if (box_servo.contain(x, y))
   {
     sw_tone();
+    LedController.flashFeedback();
     servo_home = !servo_home;
   }
 #endif
+
+// 3. 画面中央右：LED ON/OFF（サーボには影響しない）
+  if (box_led.contain(x, y))
+  {
+    sw_tone();
+    LedController.flashFeedback();
+    led_on = !led_on;
+
+    if (led_on) {
+      LedController.setState(LedState::STANDBY);
+    } else {
+      LedController.setState(LedState::OFF);
+    }
+  }
+
   if (box_BtnA.contain(x, y))
   {
     //sw_tone();
@@ -119,7 +140,6 @@ void RealtimeAiMod::display_touched(int16_t x, int16_t y)
   {
     btnC_pressed();
   }
-
 }
 
 void RealtimeAiMod::doubleTapped(float ax, float ay, float az)
@@ -131,21 +151,38 @@ void RealtimeAiMod::doubleTapped(float ax, float ay, float az)
 #endif
 }
 
-
 void RealtimeAiMod::idle(void)
 {
+  bool isSpeaking = false;
+
 #ifdef REALTIME_API_WITH_TTS
-
-  if(robot->asyncPlaying || (pRtLLM->getOutputTextQueueSize() != 0)){
-    // 発話中
-    pRtLLM->setSpeaking(true);
+  if (robot != nullptr && pRtLLM != nullptr) {
+    if(robot->asyncPlaying || (pRtLLM->getOutputTextQueueSize() != 0)){
+      isSpeaking = true;
+      pRtLLM->setSpeaking(true);
+    }
+    else{
+      pRtLLM->setSpeaking(false);
+    }
   }
-  else{
-    // 発話停止中かつキューにテキストがない場合はLLM機能に発話終了を通知
-    pRtLLM->setSpeaking(false);
-  }
-
 #endif  //REALTIME_API_WITH_TTS
+
+// ★ 青点滅（THINKING）等の終了後、led_on の状態に合わせてSTANDBYまたはOFFへ復帰
+  if (pRtLLM != nullptr) {
+    bool isRecording = pRtLLM->isRealtimeRecording();
+    
+    if (!isRecording && !isSpeaking) {
+      LedState currentState = LedController.getState();
+      
+      if (currentState == LedState::THINKING || currentState == LedState::LISTENING) {
+        if (led_on) {
+          LedController.setState(LedState::STANDBY); // LEDがONならゆらぎ点灯
+        } else {
+          LedController.setState(LedState::OFF);     // LEDがOFFなら消灯
+        }
+      }
+    }
+  }
 
   // Alarm (Function Calling)
   alarmEventHandler();
@@ -157,7 +194,6 @@ void RealtimeAiMod::idle(void)
     run_schedule();
   }
 #endif
-
 }
 
 void RealtimeAiMod::alarmEventHandler()
@@ -165,7 +201,6 @@ void RealtimeAiMod::alarmEventHandler()
   if(xAlarmTimer != NULL){
     TickType_t xRemainingTime;
 
-    /* Query the period of the timer that expires. */
     xRemainingTime = xTimerGetExpiryTime( xAlarmTimer ) - xTaskGetTickCount();
     avatarText = "Alarm countdown: " + String(xRemainingTime / 1000);
     avatar.set_isSubWindowEnable(true);
@@ -182,7 +217,6 @@ void RealtimeAiMod::alarmEventHandler()
     alarmTimerCanceled = false;
     avatar.set_isSubWindowEnable(false);
   }
-
 }
 
 void RealtimeAiMod::updateHeadTouchExpression(void)
@@ -192,6 +226,7 @@ void RealtimeAiMod::updateHeadTouchExpression(void)
     headTouchHappyUntilMs = millis() + 3000;
     headTouchHappyActive = true;
     avatar.setExpression(Expression::Happy);
+    LedController.setEmotion(LedEmotion::HAPPY); // ★ なでられた時：HAPPY発色
     Serial.printf("[HeadTouch] pet gesture=%s\n", HeadTouchSensor::gestureName(gesture));
   }
 
@@ -203,6 +238,7 @@ void RealtimeAiMod::updateHeadTouchExpression(void)
   if (headTouchHappyActive) {
     headTouchHappyActive = false;
     avatar.setExpression(Expression::Neutral);
+    LedController.setEmotion(LedEmotion::NORMAL); // ★ 復帰時：NORMAL発色
   }
 }
 
@@ -219,8 +255,10 @@ void RealtimeAiMod::toggleRealtimeRecord(void)
 {
   if(pRtLLM->isRealtimeRecording()){
     pRtLLM->stopRealtimeRecord();
+    LedController.setState(LedState::THINKING);  // ★ 録音停止時：処理中（青パルス）
   }else{
     pRtLLM->startRealtimeRecord();
+    LedController.setState(LedState::LISTENING); // ★ 録音開始時：聞き取り中（緑固定）
   }
 }
 
