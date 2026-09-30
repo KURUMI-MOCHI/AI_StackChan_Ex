@@ -111,15 +111,24 @@ void StackChanLED::setCustomStandbyColor(uint8_t r, uint8_t g, uint8_t b) {
     _baseB = b;
 }
 
-// 1/fゆらぎ計算の軽量化版
+// 1/f キャンドルゆらぎ計算（ピーク100%全開 ＋ ランダムノイズ仕様）
 float StackChanLED::calculate1OverFFlicker() {
-    _flickerPhase += 0.08f;
-    if (_flickerPhase > 6.283f) _flickerPhase -= 6.283f; // 毎フレームの余計な割り算を回避
-    
-    // 軽い三角関数合成
-    float wave = sinf(_flickerPhase) + 0.4f * sinf(_flickerPhase * 2.5f);
-    float brightness = 0.65f + (wave * 0.25f);
-    return constrain(brightness, 0.1f, 1.0f);
+    // 1. ベースとなるうねり（うっすらとした揺らぎ）
+    _flickerPhase += 0.06f;
+    if (_flickerPhase > 6.283f) _flickerPhase -= 6.283f;
+    float baseWave = sinf(_flickerPhase) * 0.12f; // ±0.12のうねり
+
+    // 2. 炎特有の不規則なパチパチ感（微細なランダムノイズ）
+    float noise = ((float)random(-100, 100) / 1000.0f); // -0.1 ~ +0.1
+
+    // 3. 風でフッと一瞬揺らぐスパイク（約4%の確率で発生）
+    float wind = (random(0, 100) < 4) ? -0.25f : 0.0f;
+
+    // ベース輝度(0.85) + うねり + ノイズ + 風
+    // 通常時は0.75〜0.9付近で揺らめき、ピーク時にしっかり1.0（100%）に到達！
+    float targetBrightness = 0.85f + baseWave + noise + wind;
+
+    return constrain(targetBrightness, 0.15f, 1.0f);
 }
 
 // タッチ検出時のフィードバック（delayを使わない完全ノンブロッキング化）
