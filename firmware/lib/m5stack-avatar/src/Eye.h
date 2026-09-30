@@ -9,7 +9,7 @@
 #include <M5GFX.h>
 #include "DrawContext.h"
 #include "Drawable.h"
-#include "stack_chan_led.h" // LED感情の定義を参照
+#include "../../../src/stack_chan_led.h" // LED感情の定義を参照
 
 namespace m5avatar {
 
