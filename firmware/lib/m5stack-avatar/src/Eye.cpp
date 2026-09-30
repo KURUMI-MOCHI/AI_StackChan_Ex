@@ -5,10 +5,6 @@
 #include "Eye.h"
 #include <cmath>
 
-// メインタスク連携用の通信変数（グローバル参照）
-extern LedEmotion pendingLedEmotion;
-extern bool hasPendingLedEmotion;
-
 namespace m5avatar {
 
 Eye::Eye(uint16_t x, uint16_t y, uint16_t r, bool isLeft) : Eye(r, isLeft) {}
@@ -31,19 +27,18 @@ void Eye::draw(M5Canvas *spi, BoundingRect rect, DrawContext *ctx) {
   // 1. ベースとなる丸目（黒目）を描画
   spi->fillCircle(cx, cy, r, primaryColor);
 
-  // 2. 左目かつ表情が変化した瞬間のみ、LEDコントローラーへ感情変更を通知
+  // 2. 左目かつ表情が変化した瞬間のみ、LEDコントローラーへ直接感情変更を通知
   if (isLeft && exp != lastExp) {
     lastExp = exp;
     switch (exp) {
-      case Expression::Happy:   pendingLedEmotion = LedEmotion::HAPPY; break;
-      case Expression::Angry:   pendingLedEmotion = LedEmotion::ANGRY; break;
-      case Expression::Sad:     pendingLedEmotion = LedEmotion::SAD; break;
-      case Expression::Sleepy:  pendingLedEmotion = LedEmotion::SLEEPY; break;
-      case Expression::Doubt:   pendingLedEmotion = LedEmotion::DOUBT; break;
+      case Expression::Happy:   LedController.setEmotion(LedEmotion::HAPPY); break;
+      case Expression::Angry:   LedController.setEmotion(LedEmotion::ANGRY); break;
+      case Expression::Sad:     LedController.setEmotion(LedEmotion::SAD); break;
+      case Expression::Sleepy:  LedController.setEmotion(LedEmotion::SLEEPY); break;
+      case Expression::Doubt:   LedController.setEmotion(LedEmotion::DOUBT); break;
       case Expression::Neutral:
-      default:                  pendingLedEmotion = LedEmotion::NORMAL; break;
+      default:                  LedController.setEmotion(LedEmotion::NORMAL); break;
     }
-    hasPendingLedEmotion = true;
   }
 
   // 3. 表情に応じた「目の切り欠き（三角マスク）」計算
