@@ -35,7 +35,7 @@ public:
     // 状態の切り替え
     void setState(LedState state);
 
-    // 感情の切り替え（STANDBY時のベース色を変更）
+    // 感情の切り替え（内部でPendingフラグを立ててupdateで安全に反映）
     void setEmotion(LedEmotion emotion);
 
     // カスタムカラーの設定
@@ -44,12 +44,17 @@ public:
     // タッチ時などのフラッシュフィードバック（ノンブロッキング）
     void flashFeedback();
 
-    // 現在のLED状態を取得
+    // 現在のLED状態・感情を取得
     LedState getState() const { return _currentState; }
+    LedEmotion getEmotion() const { return _currentEmotion; }
 
 private:
     LedState _currentState;
     LedEmotion _currentEmotion;
+
+    // --- 外部からの非同期変更要求（Pending）の保持用 ---
+    LedEmotion _pendingEmotion;
+    bool _hasPendingEmotion;
 
     uint32_t _lastUpdate;
     float _flickerPhase;
@@ -60,6 +65,9 @@ private:
 
     // 待機時のベース色 (RGB)
     uint8_t _baseR, _baseG, _baseB;
+
+    // 内部での感情反映処理
+    void applyEmotion(LedEmotion emotion);
 
     // ハードウェア送信（CoreS3 PY32 0x6F 宛てI2C送信）
     void writeHardwareLED(uint8_t r, uint8_t g, uint8_t b);

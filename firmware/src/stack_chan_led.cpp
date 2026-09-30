@@ -37,6 +37,8 @@ static void bitOff(uint8_t reg, uint8_t mask) {
 StackChanLED::StackChanLED()
     : _currentState(LedState::OFF),
       _currentEmotion(LedEmotion::NORMAL),
+      _pendingEmotion(LedEmotion::NORMAL),
+      _hasPendingEmotion(false),
       _lastUpdate(0),
       _flickerPhase(0.0f),
       _flashStep(0),
@@ -81,7 +83,16 @@ void StackChanLED::setState(LedState state) {
     _currentState = state;
 }
 
+// 外部から呼ばれた時はPendingフラグを立ててキューイングする
 void StackChanLED::setEmotion(LedEmotion emotion) {
+    if (_currentEmotion != emotion) {
+        _pendingEmotion = emotion;
+        _hasPendingEmotion = true;
+    }
+}
+
+// 内部で実際にベースカラーを書き換える処理
+void StackChanLED::applyEmotion(LedEmotion emotion) {
     _currentEmotion = emotion;
     switch (emotion) {
         case LedEmotion::NORMAL: // オレンジ
@@ -125,7 +136,6 @@ float StackChanLED::calculate1OverFFlicker() {
     float wind = (random(0, 100) < 4) ? -0.25f : 0.0f;
 
     // ベース輝度(0.85) + うねり + ノイズ + 風
-    // 通常時は0.75〜0.9付近で揺らめき、ピーク時にしっかり1.0（100%）に到達！
     float targetBrightness = 0.85f + baseWave + noise + wind;
 
     return constrain(targetBrightness, 0.15f, 1.0f);
@@ -140,6 +150,13 @@ void StackChanLED::flashFeedback() {
 
 void StackChanLED::update() {
     uint32_t now = millis();
+
+    // --- 0. 感情のPending変更があれば適用 ---
+    if (_hasPendingEmotion) {
+        _hasPendingEmotion = false;
+        applyEmotion(_pendingEmotion);
+        s_firstSend = true; // 色変更時は通信ガードを解除して即時反映を許可
+    }
 
     // --- 1. ノンブロッキング・フラッシュ点滅処理の更新 ---
     if (_flashStep > 0) {
@@ -213,7 +230,6 @@ void StackChanLED::writeHardwareLED(uint8_t r, uint8_t g, uint8_t b) {
     // 3. REG_LED_RAM (0x30) へデータ一括送信 (100kHz)
     if (M5.In_I2C.writeRegister(g_py32_i2c_addr, REG_LED_RAM, ramData, sizeof(ramData), 100000)) {
         
-        // ★最適化ポイント：readReg8を削除！
         // LED数12個 (0x0C) + リフレッシュビット (0x40) = 0x4C を直接書き込み
         writeReg8(REG_LED_CFG, 0x4C);
 
