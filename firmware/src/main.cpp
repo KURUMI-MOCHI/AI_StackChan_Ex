@@ -194,6 +194,7 @@ void lipSync(void *args)
 
 void servo(void *args)
 {
+  /*
   float gazeX, gazeY;
   DriveContext *ctx = (DriveContext *)args;
   Avatar *avatar = ctx->getAvatar();
@@ -215,6 +216,25 @@ void servo(void *args)
     }
 #endif
     delay(5000);
+  }
+  */
+ for (;;)
+  {
+#ifdef USE_SERVO
+    if(!servo_home)
+    {
+      // avatar->getGaze() に依存せず、独自に首の目標角度（度）を生成する
+      // 例：左右 ±10度、上下 ±5度の範囲でランダムに動かす
+      int targetX = random(-10, 11); 
+      int targetY = random(-5, 6);
+
+      robot->servo->moveTo(targetX, targetY);
+    } else {
+      robot->servo->moveToOrigin();
+    }
+#endif
+    // 2〜4秒に1回程度の自然な間隔で首を動かす
+    delay(2000 + random(2000));
   }
 }
 
