@@ -166,7 +166,7 @@ static void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
 
             if(msgType.equals("session.updated")){
                 Serial.printf("[WSc] payload: %s\n", payload);
-                avatar.setSpeechText("");
+                avatar.setSpeechText("Standing by...");
             }
             else if(msgType.equals("input_audio_buffer.speech_started")){
                 p_this->resetRealtimeRecordStartTime();

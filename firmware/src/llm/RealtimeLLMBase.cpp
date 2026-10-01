@@ -114,12 +114,12 @@ void RealtimeLLMBase::webSocketProcess()
     else{
         if(speaking){
             //発話中もしくはテキスト生成中
-            avatar.setSpeechText("");
+            avatar.setSpeechText("Speaking");
             resetRealtimeRecordStartTime(); //長いテキストを発話中にタイムアウトしてしまうのを防ぐ
             delay(1);
         }
         else{
-            avatar.setSpeechText("");
+            avatar.setSpeechText("Standing by...");
             delay(10);
         }
     }
