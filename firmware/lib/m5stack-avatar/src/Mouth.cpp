@@ -17,16 +17,17 @@ void Mouth::draw(M5Canvas *spi, BoundingRect rect, DrawContext *ctx) {
   uint16_t primaryColor = ctx->getColorDepth() == 1 ? 1 : ctx->getColorPalette()->get(COLOR_PRIMARY);
   float openRatio = ctx->getMouthOpenRatio(); // 0.0 〜 1.0
 
-  // 1. 口のサイズ定義（画像に合わせて閉じ口を横長90pxに調整）
-  const float closedWidth = 90.0f;  // 閉じている時の横幅（元は60）
-  const float openWidth   = 55.0f;  // 開いた時の横幅
-  const float closedHeight = 4.0f;  // 閉じている時の線の太さ
-  const float openHeight   = 32.0f; // 開いた時の縦幅
+  // 製品版 (mouth.cpp) のパラメータ定義
+  // min_size: (90, 6, radius: 0) -> max_size: (60, 50, radius: 16)
+  const float closedWidth  = 90.0f;
+  const float openWidth    = 60.0f;
+  const float closedHeight = 6.0f;
+  const float openHeight   = 50.0f;
+  const float maxRadius    = 16.0f;
 
-  // 2. 口開度に応じた可変計算
   int w = (int)(closedWidth - (closedWidth - openWidth) * openRatio);
   int h = (int)(closedHeight + (openHeight - closedHeight) * openRatio);
-  int r = (int)(10.0f * openRatio); // 開くにつれて角丸になる
+  int r = (int)(maxRadius * openRatio);
 
   int x = rect.getCenterX() - (w / 2);
   int y = rect.getCenterY() - (h / 2);

@@ -46,90 +46,7 @@ void Eye::draw(M5Canvas *spi, BoundingRect rect, DrawContext *ctx) {
     }
   }
 
-  // 3. 表情に応じた「目の切り欠き（三角マスク）」計算
-  float weight = 100.0f;
-  float rotationDeg = 0.0f;
-  bool cutFromBottom = false;
-
-  switch (exp) {
-    case Expression::Happy:
-      weight = 80.0f;
-      rotationDeg = 45.0f; // 符号反転：下側かつ内側（鼻寄り）を切り欠く
-      cutFromBottom = true;
-      break;
-    case Expression::Angry:
-      weight = 70.0f;
-      rotationDeg = -12.0f; // 符号反転：上側かつ内側（眉間寄り）を切り欠く（つり目）
-      cutFromBottom = false;
-      break;
-    case Expression::Sad:
-      weight = 70.0f;
-      rotationDeg = 8.0f; // 符号反転：上側かつ外側を切り欠く（困り・垂れ目）
-      cutFromBottom = false;
-      break;
-    case Expression::Sleepy:
-      weight = 35.0f;
-      rotationDeg = 0.0f;
-      cutFromBottom = false;
-      break;
-    case Expression::Doubt:
-      weight = 75.0f;
-      rotationDeg = 0.0f;
-      cutFromBottom = false;
-      break;
-    case Expression::Neutral:
-    default:
-      weight = 100.0f;
-      rotationDeg = 0.0f;
-      cutFromBottom = false;
-      break;
-  }
-
-  // 右目の場合は回転角度を反転
-  if (!isLeft) {
-    rotationDeg = -rotationDeg;
-  }
-
-  // 切り欠きが必要な場合（weight < 100%）、背景色でマスク三角形を描画
-  if (weight < 99.5f) {
-    float visibleHeight = (eyeR * 2.0f) * (weight / 100.0f);
-    float rad = rotationDeg * (3.14159265f / 180.0f);
-    float cosA = cosf(rad);
-    float sinA = sinf(rad);
-
-    float dx = cosA;
-    float dy = sinA;
-
-    float nx, ny;
-    if (cutFromBottom) {
-      nx = -sinA;
-      ny = cosA;
-    } else {
-      nx = sinA;
-      ny = -cosA;
-    }
-
-    float shift = eyeR - visibleHeight;
-    float p0x = cx - shift * nx;
-    float p0y = cy - shift * ny;
-
-    float L = eyeR * 3.5f; // 十分なマスクサイズ
-    float D = eyeR * 3.5f;
-
-    int x1 = (int)(p0x - L * dx);
-    int y1 = (int)(p0y - L * dy);
-    int x2 = (int)(p0x + L * dx);
-    int y2 = (int)(p0y + L * dy);
-    int x3 = (int)(p0x + L * dx + D * nx);
-    int y3 = (int)(p0y + L * dy + D * ny);
-    int x4 = (int)(p0x - L * dx + D * nx);
-    int y4 = (int)(p0y - L * dy + D * ny);
-
-    spi->fillTriangle(x1, y1, x2, y2, x3, y3, backgroundColor);
-    spi->fillTriangle(x1, y1, x3, y3, x4, y4, backgroundColor);
-  }
-
-  // 4. 上から下へ閉じる「まばたき（上まぶた）」アニメーション処理
+  // 3. まばたき（上まぶた）アニメーション状態の更新
   float targetRatio = ctx->getEyeOpenRatio();
 
   if (blinkState == BlinkState::IDLE && targetRatio < 0.8f) {
@@ -155,18 +72,84 @@ void Eye::draw(M5Canvas *spi, BoundingRect rect, DrawContext *ctx) {
     }
   }
 
-  // 上からシャッターのように降りてくるまぶたの描画
-  if (currentRatio < 0.99f) {
-    // 上下左右に3pxのマージンを持たせ、下端を残さず完全閉口保証
-    int margin = 3;
-    int fillX = cx - (int)eyeR - margin;
-    int fillY = cy - (int)eyeR - margin;
-    int fillW = (int)(eyeR * 2.0f) + (margin * 2);
-    int fillHeight = (int)(((eyeR * 2.0f) + (float)(margin * 2)) * (1.0f - currentRatio));
+  // 4. 製品版 (eyes.cpp) のパラメータ（Weight & Rotation）適用
+  float weight = 100.0f;
+  float rotationDeg = 0.0f;
 
-    if (fillHeight > 0) {
-      spi->fillRect(fillX, fillY, fillW, fillHeight, backgroundColor);
-    }
+  switch (exp) {
+    case Expression::Happy:
+      weight = 72.0f;       // 72%露出（28%だけカット）
+      rotationDeg = 155.0f; // 製品版 1550 (155.0 deg)
+      break;
+    case Expression::Angry:
+      weight = 70.0f;       // 70%露出
+      rotationDeg = 45.0f;  // 製品版 450 (45.0 deg)
+      break;
+    case Expression::Sad:
+      weight = 70.0f;       // 70%露出
+      rotationDeg = -40.0f; // 製品版 -400 (-40.0 deg)
+      break;
+    case Expression::Sleepy:
+      weight = 35.0f;       // 35%露出
+      rotationDeg = -5.0f;  // 製品版 -50 (-5.0 deg)
+      break;
+    case Expression::Doubt:
+      weight = 75.0f;
+      rotationDeg = 0.0f;
+      break;
+    case Expression::Neutral:
+    default:
+      weight = 100.0f;
+      rotationDeg = 0.0f;
+      break;
+  }
+
+  // 右目の場合は回転角度を反転 (製品版: apply_style)
+  if (!isLeft) {
+    rotationDeg = -rotationDeg;
+  }
+
+  // 表情の Weight にまばたき開度 (currentRatio) を合成
+  float effectiveWeight = weight * currentRatio;
+
+  // 5. 回転する四角やまぶた（マスク）を LVGL 同等幾何で計算描画
+  if (effectiveWeight < 99.5f) {
+    float rad = rotationDeg * (3.14159265f / 180.0f);
+    float cosA = cosf(rad);
+    float sinA = sinf(rad);
+
+    // 未回転状態での中心からのまぶた境界線距離
+    // Weight=100 -> -eyeR（最上部、削りなし）
+    // Weight=50  -> 0（中心、半月）
+    // Weight=72  -> -0.44 * eyeR（中心より上の位置。端から28%だけ削れる）
+    float limit = (1.0f - 2.0f * (effectiveWeight / 100.0f)) * eyeR;
+
+    // 回転後の境界線の基準点 P0 (目の中心 cx, cy からの移動)
+    float p0x = cx - limit * sinA;
+    float p0y = cy + limit * cosA;
+
+    // 境界線方向 T = (cosA, sinA)
+    // マスク外側方向 N = (sinA, -cosA)
+    float tx = cosA;
+    float ty = sinA;
+    float nx = sinA;
+    float ny = -cosA;
+
+    float L = eyeR * 4.0f; // 十分なマスク幅
+    float D = eyeR * 4.0f; // 十分なマスク高さ
+
+    // まぶたマスク矩形の4頂点
+    int x1 = (int)(p0x - L * tx);
+    int y1 = (int)(p0y - L * ty);
+    int x2 = (int)(p0x + L * tx);
+    int y2 = (int)(p0y + L * ty);
+    int x3 = (int)(p0x + L * tx + D * nx);
+    int y3 = (int)(p0y + L * ty + D * ny);
+    int x4 = (int)(p0x - L * tx + D * nx);
+    int y4 = (int)(p0y - L * ty + D * ny);
+
+    spi->fillTriangle(x1, y1, x2, y2, x3, y3, backgroundColor);
+    spi->fillTriangle(x1, y1, x3, y3, x4, y4, backgroundColor);
   }
 }
 
