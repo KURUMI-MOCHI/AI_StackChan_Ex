@@ -15,13 +15,21 @@ Mouth::Mouth(uint16_t minWidth, uint16_t maxWidth, uint16_t minHeight,
 
 void Mouth::draw(M5Canvas *spi, BoundingRect rect, DrawContext *ctx) {
   uint16_t primaryColor = ctx->getColorDepth() == 1 ? 1 : ctx->getColorPalette()->get(COLOR_PRIMARY);
-  float breath = _min(1.0f, ctx->getBreath());
-  float openRatio = ctx->getMouthOpenRatio();
-  int h = minHeight + (maxHeight - minHeight) * openRatio;
-  int w = minWidth + (maxWidth - minWidth) * (1 - openRatio);
-  int x = rect.getLeft() - w / 2;
-  int y = rect.getTop() - h / 2 + breath * 2;
-  spi->fillRect(x, y, w, h, primaryColor);
+  float openRatio = ctx->getMouthOpenRatio(); // 0.0 〜 1.0
+
+  // CustomMouth と同等の可変計算（閉: 横60/縦4px線 -> 開: 横40/縦32px角丸）
+  int w = 60 - (int)(20.0f * openRatio);
+  int h = 4 + (int)(28.0f * openRatio);
+  int r = (int)(10.0f * openRatio);
+
+  int x = rect.getCenterX() - (w / 2);
+  int y = rect.getCenterY() - (h / 2);
+
+  if (r > 0) {
+    spi->fillRoundRect(x, y, w, h, r, primaryColor);
+  } else {
+    spi->fillRect(x, y, w, h, primaryColor);
+  }
 }
 
 }  // namespace m5avatar
