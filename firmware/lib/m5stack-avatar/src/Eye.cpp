@@ -18,8 +18,10 @@ void Eye::draw(M5Canvas *spi, BoundingRect rect, DrawContext *ctx) {
   // 標準の視線移動（gaze）オフセットを計算
   uint32_t offsetX = g.getHorizontal() * 3;
   uint32_t offsetY = g.getVertical() * 3;
+  
   uint32_t cx = rect.getCenterX() + offsetX;
-  uint32_t cy = rect.getCenterY() + offsetY;
+  // 見た目だけ口に近づけるため、Y座標を下方向へ移動（+18px）
+  uint32_t cy = rect.getCenterY() + offsetY + 18;
 
   // 位置（cx, cy）を変えずに目だけを自然に大きく見せるための半径補正（約1.3倍）
   float eyeR = (float)r * 1.3f;
@@ -52,17 +54,17 @@ void Eye::draw(M5Canvas *spi, BoundingRect rect, DrawContext *ctx) {
   switch (exp) {
     case Expression::Happy:
       weight = 80.0f;
-      rotationDeg = -45.0f;
+      rotationDeg = 45.0f; // 符号反転：下側かつ内側（鼻寄り）を切り欠く
       cutFromBottom = true;
       break;
     case Expression::Angry:
       weight = 70.0f;
-      rotationDeg = 12.0f;
+      rotationDeg = -12.0f; // 符号反転：上側かつ内側（眉間寄り）を切り欠く（つり目）
       cutFromBottom = false;
       break;
     case Expression::Sad:
       weight = 70.0f;
-      rotationDeg = -8.0f;
+      rotationDeg = 8.0f; // 符号反転：上側かつ外側を切り欠く（困り・垂れ目）
       cutFromBottom = false;
       break;
     case Expression::Sleepy:
