@@ -119,7 +119,7 @@ void RealtimeLLMBase::webSocketProcess()
             delay(1);
         }
         else{
-            avatar.setSpeechText("Please touch");
+            avatar.setSpeechText("");
             delay(10);
         }
     }
