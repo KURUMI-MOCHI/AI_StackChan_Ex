@@ -43,7 +43,8 @@ void facialLoop(void *args) {
   unsigned long last_blink_millis = 0;
   bool eye_open = true;
 
-  for (;;) {
+for (;;) {
+    /* 視線の自動ゆらぎ処理を無効化
     if ((millis() - last_saccade_millis) > saccade_interval) {
       float vertical = rand_r(&seed) / (RAND_MAX / 2.0) - 1;
       float horizontal = rand_r(&seed) / (RAND_MAX / 2.0) - 1;
@@ -51,6 +52,8 @@ void facialLoop(void *args) {
       saccade_interval = 500 + 100 * random(20);
       last_saccade_millis = millis();
     }
+    */
+    if ((millis()- last_blink_millis) > blink_interval) {
     if ((millis()- last_blink_millis) > blink_interval) {
       if (eye_open) {
         avatar->setEyeOpenRatio(1);
