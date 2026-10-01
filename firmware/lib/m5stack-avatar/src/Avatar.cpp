@@ -44,16 +44,16 @@ void facialLoop(void *args) {
   bool eye_open = true;
 
 for (;;) {
-    /* 視線の自動ゆらぎ処理を無効化
     if ((millis() - last_saccade_millis) > saccade_interval) {
-      float vertical = rand_r(&seed) / (RAND_MAX / 2.0) - 1;
-      float horizontal = rand_r(&seed) / (RAND_MAX / 2.0) - 1;
-      avatar->setGaze(vertical, horizontal);
+      // ランダム移動を止め、見た目は正面固定（±0.001）にしつつ描画フラグを維持
+      static bool toggle = false;
+      toggle = !toggle;
+      avatar->setGaze(toggle ? 0.001f : -0.001f, toggle ? 0.001f : -0.001f);
+
       saccade_interval = 500 + 100 * random(20);
       last_saccade_millis = millis();
     }
-    */
-   
+     
     if ((millis()- last_blink_millis) > blink_interval) {
       if (eye_open) {
         avatar->setEyeOpenRatio(1);
