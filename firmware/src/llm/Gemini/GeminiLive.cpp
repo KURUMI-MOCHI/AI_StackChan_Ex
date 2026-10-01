@@ -190,7 +190,7 @@ static void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
             if(!p_this->msgDoc["setupComplete"].isNull()){
                 Serial.printf("[WSc] setupComplete\n");
                 //Serial.printf("[WSc] payload: %s\n", payload);
-                avatar.setSpeechText("Please touch");
+                avatar.setSpeechText("");
 
 #if 0   // for debug (音声の代わりにテキストのプロンプトを入力する)
                 String text_base64;
