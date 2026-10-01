@@ -52,8 +52,8 @@ void Eye::draw(M5Canvas *spi, BoundingRect rect, DrawContext *ctx) {
 
   switch (exp) {
     case Expression::Happy:
-      weight = 72.0f;       // 72%露出（28%カット）
-      rotationDeg = 155.0f; // 製品版 1550 (155.0 deg)
+      weight = 85.0f;       // 85%露出（15%カット）
+      rotationDeg = 135.0f; // 製品版 1550 (155.0 deg)
       break;
     case Expression::Angry:
       weight = 70.0f;       // 70%露出
