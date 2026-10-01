@@ -44,6 +44,7 @@ void facialLoop(void *args) {
   bool eye_open = true;
 
   for (;;) {
+    /* ★ 視線のランダム移動（サッカード）を無効化して常に正面固定
     if ((millis() - last_saccade_millis) > saccade_interval) {
       float vertical = rand_r(&seed) / (RAND_MAX / 2.0) - 1;
       float horizontal = rand_r(&seed) / (RAND_MAX / 2.0) - 1;
@@ -51,6 +52,9 @@ void facialLoop(void *args) {
       saccade_interval = 500 + 100 * random(20);
       last_saccade_millis = millis();
     }
+    */
+   
+    avatar->setGaze(0.0f, 0.0f); // 常に正面固定
     if ((millis()- last_blink_millis) > blink_interval) {
       if (eye_open) {
         avatar->setEyeOpenRatio(1);
