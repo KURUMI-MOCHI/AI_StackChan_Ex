@@ -10,8 +10,8 @@
 #include "Drawable.h"
 
 const int16_t TEXT_HEIGHT = 8;
-const int16_t TEXT_SIZE = 2;    // フォントサイズは2
-const int cy = 220;             // 画面下部Y座標
+const float TEXT_SIZE = 1.8f;   // フォントサイズを 1.8 に指定
+const int cy = 220;             // 画面下部 Y座標
 
 namespace m5avatar {
 class Balloon final : public Drawable {
@@ -39,20 +39,27 @@ class Balloon final : public Drawable {
     M5.Lcd.setFont(font);
     M5.Lcd.setTextSize(TEXT_SIZE);
 
-    // 1. 大きめの固定サイズ（210px幅でフォントサイズ2の文字もゆったり収める）
+    // 1. 吹き出しの幅を 240px に拡大（長いテキストも左右にゆとりをもって収まる）
     int boxHeight = 36;
-    int boxWidth = 210;
+    int boxWidth = 240;
 
-    // 画面右寄りに配置（左端 X=80 ～ 右端 X=290）
-    int x = 80;
+    // 左端 X=50 〜 右端 X=290 (画面幅320に対してバランス良く左右配置)
+    int x = 50;
     int y = cy - (boxHeight / 2);
-    int radius = boxHeight / 2; // カプセル形状
+    int radius = boxHeight / 2; // 完全なカプセル形状
 
-    // 2. 三角形（△）を吹き出しの右寄りに固定配置（X=250付近）
-    int arrowX = x + boxWidth - 40;
+    // 2. 三角形（△）の位置を「口」を指す位置（X=175）に再調整
+    int arrowX = 175;
+
+    // 外枠の精密計算
+    int outerX = x - 2;
+    int outerY = y - 2;
+    int outerW = boxWidth + 4;
+    int outerH = boxHeight + 4;
+    int outerR = outerH / 2;
 
     // 3. 外枠（黒枠）の描画
-    spi->fillRoundRect(x - 2, y - 2, boxWidth + 4, boxHeight + 4, radius + 2, primaryColor);
+    spi->fillRoundRect(outerX, outerY, outerW, outerH, outerR, primaryColor);
     spi->fillTriangle(arrowX - 8, y,
                       arrowX + 8, y,
                       arrowX,     y - 8,
