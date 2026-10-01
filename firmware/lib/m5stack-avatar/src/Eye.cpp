@@ -52,19 +52,19 @@ void Eye::draw(M5Canvas *spi, BoundingRect rect, DrawContext *ctx) {
 
   switch (exp) {
     case Expression::Happy:
-      weight = 72.0f;       // 72%露出（浅い切り欠き）
+      weight = 72.0f;       // 72%露出（下端から28%分だけ浅くカット）
       rotationDeg = 155.0f; // 製品版 1550 (155.0 deg)
       break;
     case Expression::Angry:
-      weight = 70.0f;
+      weight = 70.0f;       // 70%露出
       rotationDeg = 45.0f;  // 製品版 450 (45.0 deg)
       break;
     case Expression::Sad:
-      weight = 70.0f;
+      weight = 70.0f;       // 70%露出
       rotationDeg = -40.0f; // 製品版 -400 (-40.0 deg)
       break;
     case Expression::Sleepy:
-      weight = 35.0f;
+      weight = 35.0f;       // 35%露出
       rotationDeg = -5.0f;  // 製品版 -50 (-5.0 deg)
       break;
     case Expression::Doubt:
@@ -87,14 +87,14 @@ void Eye::draw(M5Canvas *spi, BoundingRect rect, DrawContext *ctx) {
     float cosA = cosf(rad);
     float sinA = sinf(rad);
 
-    // 未回転時のまぶた境界位置（Weight=72のとき、中心より上へ 0.44 * eyeR の浅いライン）
+    // 未回転時のまぶた境界位置（72%露出なら中心より下へ +0.44 * eyeR の浅いライン）
     float limit = (1.0f - 2.0f * (weight / 100.0f)) * eyeR;
 
-    // 中心 cx, cy を軸に回転した境界基準点 P0
-    float p0x = cx + limit * sinA;
-    float p0y = cy - limit * cosA;
+    // 中心 cx, cy を軸に回転した正しい境界基準点 P0
+    float p0x = cx - limit * sinA;
+    float p0y = cy + limit * cosA;
 
-    // 回転後のまぶた方向ベクトル
+    // 回転後のまぶた方向ベクトル (T) と マスク伸び方向ベクトル (N)
     float tx = cosA;
     float ty = sinA;
     float nx = sinA;
