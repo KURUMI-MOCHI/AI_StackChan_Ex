@@ -53,7 +53,7 @@ for (;;) {
       last_saccade_millis = millis();
     }
     */
-    if ((millis()- last_blink_millis) > blink_interval) {
+   
     if ((millis()- last_blink_millis) > blink_interval) {
       if (eye_open) {
         avatar->setEyeOpenRatio(1);
