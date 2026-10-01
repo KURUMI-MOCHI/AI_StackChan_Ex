@@ -17,6 +17,7 @@
 #include <base64.h>
 #include "libb64/cdecode.h"
 #include <WebSocketsClient.h>
+#include "MyRole.h" // ← 追加
 
 using namespace m5avatar;
 extern Avatar avatar;
@@ -357,6 +358,7 @@ void GeminiLive::load_role(){
     role = defaultRole;
     userInfo = "User Info: ";
   }
+  role = MY_CUSTOM_ROLE;
 }
 
 String& GeminiLive::buildInputAudioJson(String& jsonBuf, String& base64)
