@@ -21,11 +21,14 @@ void Eye::draw(M5Canvas *spi, BoundingRect rect, DrawContext *ctx) {
   uint32_t cx = rect.getCenterX() + offsetX;
   uint32_t cy = rect.getCenterY() + offsetY;
 
+  // 位置（cx, cy）を変えずに目だけを自然に大きく見せるための半径補正（約1.3倍）
+  float eyeR = (float)r * 1.3f;
+
   uint16_t primaryColor = ctx->getColorDepth() == 1 ? 1 : ctx->getColorPalette()->get(COLOR_PRIMARY);
   uint16_t backgroundColor = ctx->getColorDepth() == 1 ? 0 : ctx->getColorPalette()->get(COLOR_BACKGROUND);
 
   // 1. ベースとなる丸目（黒目）を描画
-  spi->fillCircle(cx, cy, r, primaryColor);
+  spi->fillCircle(cx, cy, (int)eyeR, primaryColor);
 
   // 2. 左目かつ表情が変化した瞬間のみ、LEDコントローラーへ直接感情変更を通知
   if (isLeft && exp != lastExp) {
@@ -87,8 +90,7 @@ void Eye::draw(M5Canvas *spi, BoundingRect rect, DrawContext *ctx) {
 
   // 切り欠きが必要な場合（weight < 100%）、背景色でマスク三角形を描画
   if (weight < 99.5f) {
-    float eyeRadius = (float)r;
-    float visibleHeight = (eyeRadius * 2.0f) * (weight / 100.0f);
+    float visibleHeight = (eyeR * 2.0f) * (weight / 100.0f);
     float rad = rotationDeg * (3.14159265f / 180.0f);
     float cosA = cosf(rad);
     float sinA = sinf(rad);
@@ -105,12 +107,12 @@ void Eye::draw(M5Canvas *spi, BoundingRect rect, DrawContext *ctx) {
       ny = -cosA;
     }
 
-    float shift = eyeRadius - visibleHeight;
+    float shift = eyeR - visibleHeight;
     float p0x = cx - shift * nx;
     float p0y = cy - shift * ny;
 
-    float L = eyeRadius * 3.0f; // 余裕を持たせたマスクサイズ
-    float D = eyeRadius * 3.0f;
+    float L = eyeR * 3.5f; // 十分なマスクサイズ
+    float D = eyeR * 3.5f;
 
     int x1 = (int)(p0x - L * dx);
     int y1 = (int)(p0y - L * dy);
@@ -153,12 +155,14 @@ void Eye::draw(M5Canvas *spi, BoundingRect rect, DrawContext *ctx) {
 
   // 上からシャッターのように降りてくるまぶたの描画
   if (currentRatio < 0.99f) {
-    int fillHeight = (int)(((float)r * 2.0f) * (1.0f - currentRatio));
+    // 上下左右に3pxのマージンを持たせ、下端を残さず完全閉口保証
+    int margin = 3;
+    int fillX = cx - (int)eyeR - margin;
+    int fillY = cy - (int)eyeR - margin;
+    int fillW = (int)(eyeR * 2.0f) + (margin * 2);
+    int fillHeight = (int)(((eyeR * 2.0f) + (float)(margin * 2)) * (1.0f - currentRatio));
+
     if (fillHeight > 0) {
-      int fillX = cx - (int)r - 1;
-      int fillY = cy - (int)r - 1;
-      int fillW = (int)((float)r * 2.0f) + 2;
-      
       spi->fillRect(fillX, fillY, fillW, fillHeight, backgroundColor);
     }
   }
