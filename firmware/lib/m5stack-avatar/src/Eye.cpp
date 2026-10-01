@@ -52,7 +52,7 @@ void Eye::draw(M5Canvas *spi, BoundingRect rect, DrawContext *ctx) {
 
   switch (exp) {
     case Expression::Happy:
-      weight = 72.0f;       // 72%露出（下端から28%分だけ浅くカット）
+      weight = 72.0f;       // 72%露出（28%カット）
       rotationDeg = 155.0f; // 製品版 1550 (155.0 deg)
       break;
     case Expression::Angry:
@@ -87,10 +87,10 @@ void Eye::draw(M5Canvas *spi, BoundingRect rect, DrawContext *ctx) {
     float cosA = cosf(rad);
     float sinA = sinf(rad);
 
-    // 未回転時のまぶた境界位置（72%露出なら中心より下へ +0.44 * eyeR の浅いライン）
+    // 未回転時のまぶた境界位置（72%露出なら中心より下へ +0.44 * eyeR の位置）
     float limit = (1.0f - 2.0f * (weight / 100.0f)) * eyeR;
 
-    // 中心 cx, cy を軸に回転した正しい境界基準点 P0
+    // 中心 cx, cy を軸に回転した境界基準点 P0
     float p0x = cx - limit * sinA;
     float p0y = cy + limit * cosA;
 
@@ -100,8 +100,9 @@ void Eye::draw(M5Canvas *spi, BoundingRect rect, DrawContext *ctx) {
     float nx = sinA;
     float ny = -cosA;
 
-    float L = eyeR * 4.0f;
-    float D = eyeR * 4.0f;
+    // ★口など他のパーツに被らないよう、黒目（直径 2*eyeR）だけを覆う最小限のサイズに絞り込み
+    float L = eyeR * 1.1f; // 横半幅（全体で 2.2 * eyeR となり直径を十分カバー）
+    float D = eyeR * 2.2f; // 削り深さ（黒目の端まで届き、かつ口には絶対届かない深さ）
 
     int x1 = (int)(p0x - L * tx);
     int y1 = (int)(p0y - L * ty);
