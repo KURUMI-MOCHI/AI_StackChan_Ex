@@ -11,8 +11,10 @@
 
 const int16_t TEXT_HEIGHT = 8;
 const int16_t TEXT_SIZE = 2;
-const int16_t MIN_WIDTH = 120;  // 画像のようなスリムな横長感を出す最小幅
-const int16_t MAX_WIDTH = 280;  // 画面幅に収まる最大幅
+const int16_t MIN_WIDTH = 100;
+const int16_t MAX_WIDTH = 280;
+const int cx = 160;  // 画面水平中央
+const int cy = 220;  // 元のコードと同じY座標（画面最下部）
 
 namespace m5avatar {
 class Balloon final : public Drawable {
@@ -31,44 +33,43 @@ class Balloon final : public Drawable {
     }
 
     ColorPalette* cp = drawContext->getColorPalette();
-    // primaryColor: 吹き出し本体（白）, backgroundColor: 文字色（黒）
     uint16_t primaryColor = cp->get(COLOR_BALLOON_FOREGROUND);
     uint16_t backgroundColor = cp->get(COLOR_BALLOON_BACKGROUND);
 
     spi->setTextSize(TEXT_SIZE);
     spi->setTextDatum(MC_DATUM);
+
     M5.Lcd.setFont(font);
     M5.Lcd.setTextSize(TEXT_SIZE);
-
     int textWidth = M5.Lcd.textWidth(text);
 
-    // 1. 製品版画像に合わせたサイズと位置の計算
-    int boxHeight = 38;                     // 画像のようなスマートな高さ
-    int boxWidth = textWidth + 24;          // 横の余白
+    // カプセルのサイズ計算
+    int boxHeight = 34;
+    int boxWidth = textWidth + 24;
     if (boxWidth < MIN_WIDTH) boxWidth = MIN_WIDTH;
     if (boxWidth > MAX_WIDTH) boxWidth = MAX_WIDTH;
 
-    int centerX = 160;                      // 画面水平中央
-    int centerY = 150;                      // 口のすぐ下に配置
+    int x = cx - (boxWidth / 2);
+    int y = cy - (boxHeight / 2);
+    int radius = boxHeight / 2; // 完全なカプセル形状
 
-    int x = centerX - (boxWidth / 2);
-    int y = centerY - (boxHeight / 2);
-    int radius = boxHeight / 2;             // 完全なカプセル形状
-
-    // 2. カプセル本体の描画
-    spi->fillRoundRect(x, y, boxWidth, boxHeight, radius, primaryColor);
-
-    // 3. 上面のシッポ（画像の口に向かう中央上向き矢印）
-    int arrowX = centerX;                   // 中央（口のすぐ下）
-    int arrowY = y;                         // 吹き出しの上面
-    spi->fillTriangle(arrowX - 6, arrowY + 2, 
-                      arrowX + 6, arrowY + 2, 
-                      arrowX,     arrowY - 7, 
+    // 1. 外枠（primaryColor：枠線・シッポ枠）
+    spi->fillRoundRect(x - 2, y - 2, boxWidth + 4, boxHeight + 4, radius + 2, primaryColor);
+    spi->fillTriangle(cx - 8, y,
+                      cx + 8, y,
+                      cx,     y - 8,
                       primaryColor);
 
-    // 4. テキスト描画
-    spi->setTextColor(backgroundColor, primaryColor);
-    spi->drawString(text, centerX, centerY, font);
+    // 2. 内側の塗りつぶし（backgroundColor：白背景）
+    spi->fillRoundRect(x, y, boxWidth, boxHeight, radius, backgroundColor);
+    spi->fillTriangle(cx - 6, y + 2,
+                      cx + 6, y + 2,
+                      cx,     y - 5,
+                      backgroundColor);
+
+    // 3. テキスト描画（カプセル中央）
+    spi->setTextColor(primaryColor, backgroundColor);
+    spi->drawString(text, cx, cy, font);
   }
 };
 
