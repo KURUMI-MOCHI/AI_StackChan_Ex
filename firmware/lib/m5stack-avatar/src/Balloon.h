@@ -10,8 +10,8 @@
 #include "Drawable.h"
 
 const int16_t TEXT_HEIGHT = 8;
-const float TEXT_SIZE = 1.8f;   // フォントサイズを 1.8 に指定
-const int cy = 220;             // 画面下部 Y座標
+const int16_t TEXT_SIZE = 2;   // フォントサイズを 2 に戻す
+const int cy = 220;            // 画面下部 Y座標
 
 namespace m5avatar {
 class Balloon final : public Drawable {
@@ -39,17 +39,17 @@ class Balloon final : public Drawable {
     M5.Lcd.setFont(font);
     M5.Lcd.setTextSize(TEXT_SIZE);
 
-    // 1. 吹き出しの幅を 240px に拡大（長いテキストも左右にゆとりをもって収まる）
+    // 1. 吹き出し幅を 260px に拡大し、右側に大きく延長
+    // (左端 X=40 〜 右端 X=300)
     int boxHeight = 36;
-    int boxWidth = 240;
+    int boxWidth = 260;
 
-    // 左端 X=50 〜 右端 X=290 (画面幅320に対してバランス良く左右配置)
-    int x = 50;
+    int x = 40;
     int y = cy - (boxHeight / 2);
-    int radius = boxHeight / 2; // 完全なカプセル形状
+    int radius = boxHeight / 2; // カプセル形状
 
-    // 2. 三角形（△）の位置を「口」を指す位置（X=175）に再調整
-    int arrowX = 175;
+    // 2. 三角形（しっぽ）の位置を右側（X=195）へ移動
+    int arrowX = 195;
 
     // 外枠の精密計算
     int outerX = x - 2;
@@ -72,7 +72,7 @@ class Balloon final : public Drawable {
                       arrowX,     y - 5,
                       backgroundColor);
 
-    // 5. テキスト描画（カプセルの中心）
+    // 5. テキスト描画（拡大したカプセルの中心）
     int textCenterX = x + (boxWidth / 2);
     spi->setTextColor(primaryColor, backgroundColor);
     spi->drawString(text, textCenterX, cy, font);
