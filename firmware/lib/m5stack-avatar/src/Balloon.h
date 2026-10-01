@@ -10,11 +10,10 @@
 #include "Drawable.h"
 
 const int16_t TEXT_HEIGHT = 8;
-const int16_t TEXT_SIZE = 2;
-const int16_t MIN_WIDTH = 100;
-const int16_t MAX_WIDTH = 280;
-const int cx = 160;  // 画面水平中央
-const int cy = 220;  // 元のコードと同じY座標（画面最下部）
+const float TEXT_SIZE = 1.5f;   // フォントサイズのみ少し小さめに変更
+const int16_t MIN_WIDTH = 110;  // 最小幅
+const int16_t MAX_WIDTH = 190;  // 右端の上限幅
+const int cy = 220;             // 画面下部
 
 namespace m5avatar {
 class Balloon final : public Drawable {
@@ -43,33 +42,36 @@ class Balloon final : public Drawable {
     M5.Lcd.setTextSize(TEXT_SIZE);
     int textWidth = M5.Lcd.textWidth(text);
 
-    // カプセルのサイズ計算
+    // 吹き出しサイズ（縦幅は34pxのまま維持）
     int boxHeight = 34;
-    int boxWidth = textWidth + 24;
+    int boxWidth = textWidth + 28;
     if (boxWidth < MIN_WIDTH) boxWidth = MIN_WIDTH;
     if (boxWidth > MAX_WIDTH) boxWidth = MAX_WIDTH;
 
-    int x = cx - (boxWidth / 2);
+    int x = 110; // 左端固定（右へ伸びる）
     int y = cy - (boxHeight / 2);
-    int radius = boxHeight / 2; // 完全なカプセル形状
+    int radius = boxHeight / 2; // カプセル形状
 
-    // 1. 外枠（primaryColor：枠線・シッポ枠）
+    int arrowX = 160; // △は口の直下（画面中央）
+
+    // 1. 外枠（黒枠）の描画
     spi->fillRoundRect(x - 2, y - 2, boxWidth + 4, boxHeight + 4, radius + 2, primaryColor);
-    spi->fillTriangle(cx - 8, y,
-                      cx + 8, y,
-                      cx,     y - 8,
+    spi->fillTriangle(arrowX - 8, y,
+                      arrowX + 8, y,
+                      arrowX,     y - 8,
                       primaryColor);
 
-    // 2. 内側の塗りつぶし（backgroundColor：白背景）
+    // 2. 内側（白背景）の描画
     spi->fillRoundRect(x, y, boxWidth, boxHeight, radius, backgroundColor);
-    spi->fillTriangle(cx - 6, y + 2,
-                      cx + 6, y + 2,
-                      cx,     y - 5,
+    spi->fillTriangle(arrowX - 6, y + 2,
+                      arrowX + 6, y + 2,
+                      arrowX,     y - 5,
                       backgroundColor);
 
-    // 3. テキスト描画（カプセル中央）
+    // 3. テキスト描画
+    int textCenterX = x + (boxWidth / 2);
     spi->setTextColor(primaryColor, backgroundColor);
-    spi->drawString(text, cx, cy, font);
+    spi->drawString(text, textCenterX, cy, font);
   }
 };
 
