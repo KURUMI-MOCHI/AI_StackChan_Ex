@@ -28,9 +28,9 @@ extern void alarm_tone();
 RealtimeAiMod::RealtimeAiMod(bool _isOffline)
   : isOffline{_isOffline}
 {
-  box_stt.setupBox(0, 0, M5.Display.width(), 60); // 画面上部：会話モード
-  box_servo.setupBox(60, 120, 80, 80);            // 画面中央左：サーボON/OFF
-  box_led.setupBox(180, 120, 80, 80);             // 画面中央右：LED ON/OFF
+  box_stt.setupBox(0, M5.Display.height() - 60, M5.Display.width(), 60); // 画面下部：会話モード
+  box_servo.setupBox(60, 100, 80, 60);             // 画面中央左：サーボON/OFF
+  box_led.setupBox(180, 100, 80, 60);              // 画面中央右：LED ON/OFF
   box_BtnA.setupBox(0, 100, 40, 60);
   box_BtnC.setupBox(280, 100, 40, 60);
 
