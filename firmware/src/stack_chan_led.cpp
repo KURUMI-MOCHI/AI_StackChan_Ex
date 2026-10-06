@@ -144,7 +144,7 @@ float StackChanLED::calculateIntermittentChaos() {
 
     // --- ローパスフィルタ（空気の粘性と慣性の再現） ---
     // 0.15f（追従係数）：数字を小さくするほど「重たくしっとり」、大きくするほど「素早くバタバタ」になります。
-    _smoothedChaos += (_chaosX - _smoothedChaos) * 0.15f;
+    _smoothedChaos += (_chaosX - _smoothedChaos) * 0.45f;
 
     return _smoothedChaos; 
 }
