@@ -40,7 +40,7 @@ StackChanLED::StackChanLED()
       _pendingEmotion(LedEmotion::NORMAL),
       _hasPendingEmotion(false),
       _lastUpdate(0),
-      _chaosX(0.1f), // カオス変数の初期値（0以外に設定）
+      _flickerPhase(0.0f),
       _flashStep(0),
       _flashStepTime(0),
       _baseR(255), _baseG(60), _baseB(0) {}
@@ -122,36 +122,23 @@ void StackChanLED::setCustomStandbyColor(uint8_t r, uint8_t g, uint8_t b) {
     _baseB = b;
 }
 
-// 1/f 間欠性カオス ＋ 旧コード風テンポのハイブリッド輝度計算
-float StackChanLED::calculateIntermittentChaos() {
-    // --- 1. ベースの大きな揺らぎ（低速化した間欠性カオス） ---
-    // 変化をマイルドにして、旧コードのような「ゆったりした大きな呼吸」を作る
-    float x = _chaosX;
-    if (x < 0.5f) {
-        x = x + (2.0f * x * x) * 0.08f; 
-    } else {
-        x = x - (2.0f * (1.0f - x) * (1.0f - x)) * 0.15f;
-    }
-    
-    // 停滞防止
-    if (x <= 0.02f) x = 0.02f + (static_cast<float>(random(1, 50)) / 10000.0f);
-    if (x >= 0.98f) x = 0.98f - (static_cast<float>(random(1, 50)) / 10000.0f);
-    _chaosX = x;
+// 1/f キャンドルゆらぎ計算（ピーク100%全開 ＋ ランダムノイズ仕様）
+float StackChanLED::calculate1OverFFlicker() {
+    // 1. ベースとなるうねり（うっすらとした揺らぎ）
+    _flickerPhase += 0.06f;
+    if (_flickerPhase > 6.283f) _flickerPhase -= 6.283f;
+    float baseWave = sinf(_flickerPhase) * 0.12f; // ±0.12のうねり
 
-    // --- 2. 旧コード風「風の揺らぎ」（約3%の確率で発生し、スーッと戻る） ---
-    if (random(0, 100) < 3) {
-        _windEffect = 0.22f; // 風で一瞬フッと暗くなる
-    } else {
-        _windEffect *= 0.80f; // 風が止んだら滑らかに元の明るさに復帰
-    }
+    // 2. 炎特有の不規則なパチパチ感（微細なランダムノイズ）
+    float noise = ((float)random(-100, 100) / 1000.0f); // -0.1 ~ +0.1
 
-    // --- 3. 火の微細なチカチカ感（細かな高周波ノイズ） ---
-    float microNoise = (static_cast<float>(random(-40, 41)) / 1000.0f); // ±0.04
+    // 3. 風でフッと一瞬揺らぐスパイク（約4%の確率で発生）
+    float wind = (random(0, 100) < 4) ? -0.25f : 0.0f;
 
-    // 【合成】ベース(0.35～0.95) ＋ チカチカ － 風の減衰
-    float brightness = 0.35f + (_chaosX * 0.60f) + microNoise - _windEffect;
+    // ベース輝度(0.85) + うねり + ノイズ + 風
+    float targetBrightness = 0.85f + baseWave + noise + wind;
 
-    return constrain(brightness, 0.15f, 1.0f);
+    return constrain(targetBrightness, 0.15f, 1.0f);
 }
 
 // タッチ検出時のフィードバック（delayを使わない完全ノンブロッキング化）
@@ -201,18 +188,13 @@ void StackChanLED::update() {
             break;
 
         case LedState::STANDBY: {
-            float brightness = calculateIntermittentChaos(); // 0.15 ～ 1.00
-
-            // 輝度に連動したリアルな色変化
-            // 明るい時：黄色みがかった温かい炎 / 暗い時：緑が消えて「炭火のような深い赤」
-            uint8_t r = static_cast<uint8_t>(_baseR * brightness);
-            uint8_t g = static_cast<uint8_t>(_baseG * (brightness * brightness)); // 二乗減衰
-            uint8_t b = static_cast<uint8_t>(_baseB * brightness);
-
+            float factor = calculate1OverFFlicker();
+            uint8_t r = static_cast<uint8_t>(_baseR * factor);
+            uint8_t g = static_cast<uint8_t>(_baseG * factor);
+            uint8_t b = static_cast<uint8_t>(_baseB * factor);
             writeHardwareLED(r, g, b);
             break;
         }
-
         case LedState::LISTENING:
             writeHardwareLED(0, 255, 0); // 緑
             break;
