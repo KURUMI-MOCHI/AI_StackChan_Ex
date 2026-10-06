@@ -6,7 +6,7 @@
 // LEDの状態定義
 enum class LedState {
     OFF,        // 消灯状態
-    STANDBY,    // 待機中（1/f ゆらぎ発光）
+    STANDBY,    // 待機中（間欠性カオス発光）
     LISTENING,  // 聞き取り中（緑点灯）
     THINKING,   // 返答準備中（青点滅）
     SPEAKING    // 発話中（青点亮）
@@ -57,7 +57,9 @@ private:
     bool _hasPendingEmotion;
 
     uint32_t _lastUpdate;
-    float _flickerPhase;
+    
+    // 間欠性カオス変数（0.0 ~ 1.0）
+    float _chaosX;
 
     // フラッシュフィードバック用ステート変数（ノンブロッキング用）
     uint8_t _flashStep;        // 0:なし, 1:1回目白, 2:消灯, 3:2回目白
@@ -72,8 +74,8 @@ private:
     // ハードウェア送信（CoreS3 PY32 0x6F 宛てI2C送信）
     void writeHardwareLED(uint8_t r, uint8_t g, uint8_t b);
 
-    // 1/fゆらぎの輝度計算
-    float calculate1OverFFlicker();
+    // 間欠性カオスによる輝度計算
+    float calculateIntermittentChaos();
 };
 
 extern StackChanLED LedController;

@@ -40,7 +40,7 @@ StackChanLED::StackChanLED()
       _pendingEmotion(LedEmotion::NORMAL),
       _hasPendingEmotion(false),
       _lastUpdate(0),
-      _flickerPhase(0.0f),
+      _chaosX(0.1f), // カオス変数の初期値（0以外に設定）
       _flashStep(0),
       _flashStepTime(0),
       _baseR(255), _baseG(60), _baseB(0) {}
@@ -122,23 +122,32 @@ void StackChanLED::setCustomStandbyColor(uint8_t r, uint8_t g, uint8_t b) {
     _baseB = b;
 }
 
-// 1/f キャンドルゆらぎ計算（ピーク100%全開 ＋ ランダムノイズ仕様）
-float StackChanLED::calculate1OverFFlicker() {
-    // 1. ベースとなるうねり（うっすらとした揺らぎ）
-    _flickerPhase += 0.06f;
-    if (_flickerPhase > 6.283f) _flickerPhase -= 6.283f;
-    float baseWave = sinf(_flickerPhase) * 0.12f; // ±0.12のうねり
+// 間欠性カオスによる1/fゆらぎ輝度計算
+float StackChanLED::calculateIntermittentChaos() {
+    float x = _chaosX;
 
-    // 2. 炎特有の不規則なパチパチ感（微細なランダムノイズ）
-    float noise = ((float)random(-100, 100) / 1000.0f); // -0.1 ~ +0.1
+    // 1次元非線形写像 (Pomeau-Manneville型)
+    // x < 0.5 の領域では緩やかに増加（層流：静かな炎）
+    // x >= 0.5 の領域で引き戻され急速に変化（乱流：風によるチラつき）
+    if (x < 0.5f) {
+        x = x + 2.0f * x * x;
+    } else {
+        x = x - 2.0f * (1.0f - x) * (1.0f - x);
+    }
 
-    // 3. 風でフッと一瞬揺らぐスパイク（約4%の確率で発生）
-    float wind = (random(0, 100) < 4) ? -0.25f : 0.0f;
+    // 端点 (0.0, 1.0) への落とし込み・固定化を防ぐ摂動処理
+    if (x <= 0.001f) {
+        x = 0.001f + (static_cast<float>(random(1, 100)) / 10000.0f);
+    } else if (x >= 0.999f) {
+        x = 0.999f - (static_cast<float>(random(1, 100)) / 10000.0f);
+    }
 
-    // ベース輝度(0.85) + うねり + ノイズ + 風
-    float targetBrightness = 0.85f + baseWave + noise + wind;
+    _chaosX = x;
 
-    return constrain(targetBrightness, 0.15f, 1.0f);
+    // カオス変数 x (0.0 ~ 1.0) を LED の輝度係数 (0.25 ~ 1.00) にスケーリング
+    float brightness = 0.25f + (_chaosX * 0.75f);
+
+    return constrain(brightness, 0.15f, 1.0f);
 }
 
 // タッチ検出時のフィードバック（delayを使わない完全ノンブロッキング化）
@@ -188,7 +197,7 @@ void StackChanLED::update() {
             break;
 
         case LedState::STANDBY: {
-            float factor = calculate1OverFFlicker();
+            float factor = calculateIntermittentChaos();
             uint8_t r = static_cast<uint8_t>(_baseR * factor);
             uint8_t g = static_cast<uint8_t>(_baseG * factor);
             uint8_t b = static_cast<uint8_t>(_baseB * factor);
