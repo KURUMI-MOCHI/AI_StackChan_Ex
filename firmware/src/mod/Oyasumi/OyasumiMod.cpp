@@ -44,7 +44,7 @@ void OyasumiMod::idle(void)
             sleepTimer = millis();
 
             avatar.setExpression(Expression::Sleepy);
-            avatar.setSpeechText("Good night, master.");
+            avatar.setSpeechText("Yes, master...");
         }
     }
     else if (state == SleepState::GOING_TO_SLEEP) {
