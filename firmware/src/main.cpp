@@ -40,6 +40,7 @@
 
 #include "WebAPI.h"
 #include "stack_chan_led.h"  // ← 追加
+#include "mod/Oyasumi/OyasumiMod.h" // ← 追加
 
 #if defined( ENABLE_CAMERA )
 #include "driver/Camera.h"
@@ -468,6 +469,7 @@ ModBase* init_mod(void)
   //add_mod(new PomodoroMod(isOffline));
   //add_mod(new PhotoFrameMod(isOffline));
   //add_mod(new QRdisplayMod());
+  add_mod(new OyasumiMod()); // ★追加
   mod = get_current_mod();
   mod->init();
   return mod;
