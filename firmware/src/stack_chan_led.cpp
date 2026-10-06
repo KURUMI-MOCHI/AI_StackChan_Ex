@@ -122,36 +122,36 @@ void StackChanLED::setCustomStandbyColor(uint8_t r, uint8_t g, uint8_t b) {
     _baseB = b;
 }
 
+// 1/f 間欠性カオス ＋ 旧コード風テンポのハイブリッド輝度計算
 float StackChanLED::calculateIntermittentChaos() {
+    // --- 1. ベースの大きな揺らぎ（低速化した間欠性カオス） ---
+    // 変化をマイルドにして、旧コードのような「ゆったりした大きな呼吸」を作る
     float x = _chaosX;
-
-    // 1. Pomeau-Manneville 写像
     if (x < 0.5f) {
-        x = x + 2.0f * x * x;
+        x = x + (2.0f * x * x) * 0.08f; 
     } else {
-        x = x - 2.0f * (1.0f - x) * (1.0f - x);
+        x = x - (2.0f * (1.0f - x) * (1.0f - x)) * 0.15f;
     }
-
-    // 2. ★決定論的パターンの破壊★
-    // 毎回ほんのわずか（±1.5%）だけランダムな揺らぎを混ぜることで、
-    // 「同じ立ち上がり軌跡」を二度と描かなくする（脳がパターンを見破れなくなる）
-    float micro_pert = (static_cast<float>(random(-15, 16)) / 1000.0f);
-    x += micro_pert;
-
-    // Zero-Trapping（底でのフリーズ）防止
-    if (x < 0.08f) {
-        x = 0.08f + (static_cast<float>(random(1, 100)) / 2000.0f);
-    } else if (x > 0.999f) {
-        x = 0.999f - (static_cast<float>(random(1, 100)) / 2000.0f);
-    }
-
+    
+    // 停滞防止
+    if (x <= 0.02f) x = 0.02f + (static_cast<float>(random(1, 50)) / 10000.0f);
+    if (x >= 0.98f) x = 0.98f - (static_cast<float>(random(1, 50)) / 10000.0f);
     _chaosX = x;
 
-    // 3. ★ローパスを「超極浅（0.80f）」にする（またはそのまま _chaosX を返す）★
-    // ほぼダイレクトに反映させ、火の瞬き（スパイク）を残す
-    _smoothedChaos += (_chaosX - _smoothedChaos) * 0.80f;
+    // --- 2. 旧コード風「風の揺らぎ」（約3%の確率で発生し、スーッと戻る） ---
+    if (random(0, 100) < 3) {
+        _windEffect = 0.22f; // 風で一瞬フッと暗くなる
+    } else {
+        _windEffect *= 0.80f; // 風が止んだら滑らかに元の明るさに復帰
+    }
 
-    return _smoothedChaos;
+    // --- 3. 火の微細なチカチカ感（細かな高周波ノイズ） ---
+    float microNoise = (static_cast<float>(random(-40, 41)) / 1000.0f); // ±0.04
+
+    // 【合成】ベース(0.35～0.95) ＋ チカチカ － 風の減衰
+    float brightness = 0.35f + (_chaosX * 0.60f) + microNoise - _windEffect;
+
+    return constrain(brightness, 0.15f, 1.0f);
 }
 
 // タッチ検出時のフィードバック（delayを使わない完全ノンブロッキング化）
@@ -201,27 +201,18 @@ void StackChanLED::update() {
             break;
 
         case LedState::STANDBY: {
-            float chaos = calculateIntermittentChaos(); // 0.08 ～ 1.0
+            float brightness = calculateIntermittentChaos(); // 0.15 ～ 1.00
 
-            // 1. 輝度のスケーリング（消えかけ感を出しつつ暗すぎない 0.30 ～ 1.0 に設定）
-            float brightness = 0.30f + (chaos * 0.70f);
-
-            // 2. 色温度（リアルな炎の明暗連動）の計算
-            // R (赤): 明るさに比例して素直にスケール
+            // 輝度に連動したリアルな色変化
+            // 明るい時：黄色みがかった温かい炎 / 暗い時：緑が消えて「炭火のような深い赤」
             uint8_t r = static_cast<uint8_t>(_baseR * brightness);
-
-            // G (緑): 輝度の「二乗」で減衰させる！
-            // -> 明るい時(1.0)は緑が残って黄色っぽく輝く
-            // -> 暗い時(0.3)は緑が急激に消えて(0.09)、「炭火のような深い赤」に傾く
-            float g_factor = brightness * brightness;
-            uint8_t g = static_cast<uint8_t>(_baseG * g_factor);
-
-            // B (青): 通常時はほぼ0。青や紫系の感情時のみ明るさに連動
+            uint8_t g = static_cast<uint8_t>(_baseG * (brightness * brightness)); // 二乗減衰
             uint8_t b = static_cast<uint8_t>(_baseB * brightness);
 
             writeHardwareLED(r, g, b);
             break;
         }
+
         case LedState::LISTENING:
             writeHardwareLED(0, 255, 0); // 緑
             break;
