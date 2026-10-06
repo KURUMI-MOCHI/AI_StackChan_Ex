@@ -125,13 +125,18 @@ void StackChanLED::setCustomStandbyColor(uint8_t r, uint8_t g, uint8_t b) {
 float StackChanLED::calculateIntermittentChaos() {
     float x = _chaosX;
 
-    // Pomeau-Manneville 写像
+    // 1. Pomeau-Manneville 写像
     if (x < 0.5f) {
-        float micro_noise = (static_cast<float>(random(-5, 6)) / 2000.0f);
-        x = x + 2.0f * x * x + micro_noise;
+        x = x + 2.0f * x * x;
     } else {
         x = x - 2.0f * (1.0f - x) * (1.0f - x);
     }
+
+    // 2. ★決定論的パターンの破壊★
+    // 毎回ほんのわずか（±1.5%）だけランダムな揺らぎを混ぜることで、
+    // 「同じ立ち上がり軌跡」を二度と描かなくする（脳がパターンを見破れなくなる）
+    float micro_pert = (static_cast<float>(random(-15, 16)) / 1000.0f);
+    x += micro_pert;
 
     // Zero-Trapping（底でのフリーズ）防止
     if (x < 0.08f) {
@@ -142,11 +147,11 @@ float StackChanLED::calculateIntermittentChaos() {
 
     _chaosX = x;
 
-    // --- ローパスフィルタ（空気の粘性と慣性の再現） ---
-    // 0.15f（追従係数）：数字を小さくするほど「重たくしっとり」、大きくするほど「素早くバタバタ」になります。
-    _smoothedChaos += (_chaosX - _smoothedChaos) * 0.45f;
+    // 3. ★ローパスを「超極浅（0.80f）」にする（またはそのまま _chaosX を返す）★
+    // ほぼダイレクトに反映させ、火の瞬き（スパイク）を残す
+    _smoothedChaos += (_chaosX - _smoothedChaos) * 0.80f;
 
-    return _smoothedChaos; 
+    return _smoothedChaos;
 }
 
 // タッチ検出時のフィードバック（delayを使わない完全ノンブロッキング化）
