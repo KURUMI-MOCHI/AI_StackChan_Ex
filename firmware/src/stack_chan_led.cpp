@@ -122,21 +122,18 @@ void StackChanLED::setCustomStandbyColor(uint8_t r, uint8_t g, uint8_t b) {
     _baseB = b;
 }
 
-// 間欠性カオスによる1/fゆらぎ計算（停滞防止処理つき）
 float StackChanLED::calculateIntermittentChaos() {
     float x = _chaosX;
 
     // Pomeau-Manneville 写像
     if (x < 0.5f) {
-        // ごく微小な空気の揺らぎ（ゆらぎノイズ）をわずかに混ぜて完全停止を防ぐ
         float micro_noise = (static_cast<float>(random(-5, 6)) / 2000.0f);
         x = x + 2.0f * x * x + micro_noise;
     } else {
         x = x - 2.0f * (1.0f - x) * (1.0f - x);
     }
 
-    // --- 0近傍でのフリーズ（Zero-Trapping）防止 ---
-    // 下限値を 0.08 に底上げし、暗部に入っても即座に脱出し始めるようにする
+    // Zero-Trapping（底でのフリーズ）防止
     if (x < 0.08f) {
         x = 0.08f + (static_cast<float>(random(1, 100)) / 2000.0f);
     } else if (x > 0.999f) {
@@ -145,7 +142,11 @@ float StackChanLED::calculateIntermittentChaos() {
 
     _chaosX = x;
 
-    return _chaosX; // 0.08 ～ 1.0 の値を返す
+    // --- ローパスフィルタ（空気の粘性と慣性の再現） ---
+    // 0.15f（追従係数）：数字を小さくするほど「重たくしっとり」、大きくするほど「素早くバタバタ」になります。
+    _smoothedChaos += (_chaosX - _smoothedChaos) * 0.15f;
+
+    return _smoothedChaos; 
 }
 
 // タッチ検出時のフィードバック（delayを使わない完全ノンブロッキング化）
