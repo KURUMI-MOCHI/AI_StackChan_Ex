@@ -122,32 +122,30 @@ void StackChanLED::setCustomStandbyColor(uint8_t r, uint8_t g, uint8_t b) {
     _baseB = b;
 }
 
-// 間欠性カオスによる1/fゆらぎ輝度計算
+// 間欠性カオスによる1/fゆらぎ計算（停滞防止処理つき）
 float StackChanLED::calculateIntermittentChaos() {
     float x = _chaosX;
 
-    // 1次元非線形写像 (Pomeau-Manneville型)
-    // x < 0.5 の領域では緩やかに増加（層流：静かな炎）
-    // x >= 0.5 の領域で引き戻され急速に変化（乱流：風によるチラつき）
+    // Pomeau-Manneville 写像
     if (x < 0.5f) {
-        x = x + 2.0f * x * x;
+        // ごく微小な空気の揺らぎ（ゆらぎノイズ）をわずかに混ぜて完全停止を防ぐ
+        float micro_noise = (static_cast<float>(random(-5, 6)) / 2000.0f);
+        x = x + 2.0f * x * x + micro_noise;
     } else {
         x = x - 2.0f * (1.0f - x) * (1.0f - x);
     }
 
-    // 端点 (0.0, 1.0) への落とし込み・固定化を防ぐ摂動処理
-    if (x <= 0.001f) {
-        x = 0.001f + (static_cast<float>(random(1, 100)) / 10000.0f);
-    } else if (x >= 0.999f) {
-        x = 0.999f - (static_cast<float>(random(1, 100)) / 10000.0f);
+    // --- 0近傍でのフリーズ（Zero-Trapping）防止 ---
+    // 下限値を 0.08 に底上げし、暗部に入っても即座に脱出し始めるようにする
+    if (x < 0.08f) {
+        x = 0.08f + (static_cast<float>(random(1, 100)) / 2000.0f);
+    } else if (x > 0.999f) {
+        x = 0.999f - (static_cast<float>(random(1, 100)) / 2000.0f);
     }
 
     _chaosX = x;
 
-    // カオス変数 x (0.0 ~ 1.0) を LED の輝度係数 (0.25 ~ 1.00) にスケーリング
-    float brightness = 0.25f + (_chaosX * 0.75f);
-
-    return constrain(brightness, 0.15f, 1.0f);
+    return _chaosX; // 0.08 ～ 1.0 の値を返す
 }
 
 // タッチ検出時のフィードバック（delayを使わない完全ノンブロッキング化）
@@ -197,10 +195,24 @@ void StackChanLED::update() {
             break;
 
         case LedState::STANDBY: {
-            float factor = calculateIntermittentChaos();
-            uint8_t r = static_cast<uint8_t>(_baseR * factor);
-            uint8_t g = static_cast<uint8_t>(_baseG * factor);
-            uint8_t b = static_cast<uint8_t>(_baseB * factor);
+            float chaos = calculateIntermittentChaos(); // 0.08 ～ 1.0
+
+            // 1. 輝度のスケーリング（消えかけ感を出しつつ暗すぎない 0.30 ～ 1.0 に設定）
+            float brightness = 0.30f + (chaos * 0.70f);
+
+            // 2. 色温度（リアルな炎の明暗連動）の計算
+            // R (赤): 明るさに比例して素直にスケール
+            uint8_t r = static_cast<uint8_t>(_baseR * brightness);
+
+            // G (緑): 輝度の「二乗」で減衰させる！
+            // -> 明るい時(1.0)は緑が残って黄色っぽく輝く
+            // -> 暗い時(0.3)は緑が急激に消えて(0.09)、「炭火のような深い赤」に傾く
+            float g_factor = brightness * brightness;
+            uint8_t g = static_cast<uint8_t>(_baseG * g_factor);
+
+            // B (青): 通常時はほぼ0。青や紫系の感情時のみ明るさに連動
+            uint8_t b = static_cast<uint8_t>(_baseB * brightness);
+
             writeHardwareLED(r, g, b);
             break;
         }
