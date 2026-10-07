@@ -64,7 +64,7 @@ void Eye::draw(M5Canvas *spi, BoundingRect rect, DrawContext *ctx) {
       rotationDeg = -40.0f; // 製品版 -400 (-40.0 deg)
       break;
     case Expression::Sleepy:
-      weight = 50.0f;       // 35%露出
+      weight = 60.0f;       // 35%露出
       rotationDeg = -5.0f;  // 製品版 -50 (-5.0 deg)
       break;
     case Expression::Doubt:

@@ -219,26 +219,51 @@ void RealtimeAiMod::alarmEventHandler()
   }
 }
 
+// 関数の直前に追加（元の状態を保持するフラグ）
+static bool prev_servo_home_state = false;
+
 void RealtimeAiMod::updateHeadTouchExpression(void)
 {
   HeadTouchSensor::Gesture gesture = HeadTouchSensor::update();
+
+  // なでなでを検知したとき
   if (HeadTouchSensor::isPetGesture(gesture)) {
+    // ★ 撫で始めの最初の1回目だけ、元のサーボON/OFF状態を保存する
+    if (!headTouchHappyActive) {
+      headTouchHappyActive = true;
+      prev_servo_home_state = servo_home; // 撫でられる直前の状態（ON/OFF）を記憶
+      servo_home = false;                 // リアクション中はランダム首振りを一時停止
+
+      avatar.setExpression(Expression::Happy);
+      LedController.setEmotion(LedEmotion::HAPPY);
+
+      // ★ 5度だけ上を向かせる（動作が逆向きの場合は 5 に変更してください）
+      if (robot != nullptr && robot->servo != nullptr) {
+        robot->servo->moveTo(0, -5);
+      }
+
+      Serial.printf("[HeadTouch] pet gesture=%s -> Servo Up 5 deg\n", HeadTouchSensor::gestureName(gesture));
+    }
+
+    // タイマー更新（撫で続けている間は3秒延長）
     headTouchHappyUntilMs = millis() + 3000;
-    headTouchHappyActive = true;
-    avatar.setExpression(Expression::Happy);
-    LedController.setEmotion(LedEmotion::HAPPY); // ★ なでられた時：HAPPY発色
-    Serial.printf("[HeadTouch] pet gesture=%s\n", HeadTouchSensor::gestureName(gesture));
   }
 
-  if (headTouchHappyActive && millis() < headTouchHappyUntilMs) {
-    avatar.setExpression(Expression::Happy);
-    return;
-  }
-
-  if (headTouchHappyActive) {
+  // 3秒経過して通常状態に復帰するとき
+  if (headTouchHappyActive && millis() >= headTouchHappyUntilMs) {
     headTouchHappyActive = false;
     avatar.setExpression(Expression::Neutral);
-    LedController.setEmotion(LedEmotion::NORMAL); // ★ 復帰時：NORMAL発色
+    LedController.setEmotion(LedEmotion::NORMAL);
+
+    // 正面（元の位置）に戻す
+    if (robot != nullptr && robot->servo != nullptr) {
+      robot->servo->moveToOrigin();
+    }
+
+    // ★ 撫でられる前のサーボ状態（ONかOFFか）をそのまま復元
+    servo_home = prev_servo_home_state;
+
+    Serial.println("[HeadTouch] Restored servo state and returned to origin.");
   }
 }
 
