@@ -5,8 +5,8 @@
 #include "mod/ModBase.h"
 #include <Avatar.h>
 #include <M5GFX.h>
-#include "HeadTouchSensor.h"
-#include "LedController.h"
+#include "driver/HeadTouchSensor.h"
+#include "stack_chan_led.h"
 
 #define COLOR_ORANGE   0xFDA0  // モードA (オレンジ)
 #define COLOR_TEAL     0x0410  // モードB (ティール)
