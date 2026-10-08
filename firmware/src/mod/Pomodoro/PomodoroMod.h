@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include "mod/ModBase.h"
 #include <Avatar.h>
+#include <M5GFX.h>
 
 // テーマカラー定義 (RGB565)
 #define COLOR_ORANGE  0xFDA0  // モードA (オレンジ)
@@ -24,8 +25,8 @@ typedef enum {
 
 class PomodoroMod;
 
-// Avatarの描画キャンバス上に重ね描画するためのエフェクトクラス
-class PomodoroOverlay : public m5avatar::Effect {
+// m5avatar::Drawable を継承して画面重ね描画を作成
+class PomodoroOverlay : public m5avatar::Drawable {
 private:
     PomodoroMod* mod;
 public:
@@ -37,8 +38,7 @@ class PomodoroMod : public ModBase {
 private:
     box_t box_top_A;  // 左上 (Aモード設定・リセット)
     box_t box_top_B;  // 右上 (Bモード設定・リセット)
-    box_center.setupBox(50, 50, 220, 140); // 中央 (スタート/一時停止)
-    box_t box_center;
+    box_t box_center; // 中央 (スタート/一時停止)
 
     PomodoroStatus status;
     bool isOffline;

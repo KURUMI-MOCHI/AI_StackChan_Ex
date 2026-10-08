@@ -12,9 +12,9 @@ extern void sw_tone();
 extern void alarm_tone();
 ///////////////
 
-// オーバーレイ描画エントリーポイント（Avatarの描画ループ内から呼ばれる）
+// Drawable::draw のオーバーライド実装
 void PomodoroOverlay::draw(M5Canvas *canvas, m5avatar::BoundingRect rect) {
-    if (mod) {
+    if (mod && canvas) {
         mod->drawOverlayUI(canvas);
     }
 }
@@ -29,7 +29,7 @@ PomodoroMod::PomodoroMod(bool _isOffline)
     current_b_min = default_b_min;
     status = READY_A;
 
-    // タッチ領域定義
+    // タッチ領域定義（コンストラクタ内で初期化）
     box_top_A.setupBox(0, 0, 100, 50);       // 左上 A領域
     box_top_B.setupBox(220, 0, 100, 50);     // 右上 B領域
     box_center.setupBox(50, 50, 220, 140);   // 中央（顔エリア）
@@ -41,8 +41,10 @@ void PomodoroMod::init(void) {
     current_b_min = default_b_min;
     is_active = true;
 
-    avatar.setSpeechText("");   // 吹き出しクリア
-    avatar.addEffect(&overlay); // Avatarのエフェクト（重ね描画）レイヤーに追加
+    avatar.setSpeechText("");
+    
+    // Avatar の描画レイヤー（Feature / Drawable）に追加
+    avatar.addFeature(&overlay);
 }
 
 void PomodoroMod::pause(void) {
@@ -138,7 +140,7 @@ void PomodoroMod::drawOverlayUI(M5Canvas *canvas) {
         textB += ":" + String(current_b_min);
     }
 
-    // 黒背景で文字ボックスを軽くクリアしてから上書き
+    // 黒背景で文字ボックスをクリアしてから描画
     canvas->fillRect(0, 0, 90, 24, TFT_BLACK);
     canvas->fillRect(230, 0, 90, 24, TFT_BLACK);
 
@@ -258,15 +260,13 @@ void PomodoroMod::idle(void) {
         updateBreathingLED(theme_color);
     }
 
-    // タイマー進行・判定処理（描画呼び出しは一切行わない）
+    // タイマー進行・判定処理
     if (status == RUNNING_A || status == RUNNING_B) {
         uint32_t elapsed = millis() - start_time_ms;
 
         if (elapsed >= total_duration_ms) {
-            // タイムアップ処理
             triggerNotification();
 
-            // サイクル完了後の切り替え
             if (status == RUNNING_A) {
                 current_a_min = default_a_min;
                 status = READY_B;
