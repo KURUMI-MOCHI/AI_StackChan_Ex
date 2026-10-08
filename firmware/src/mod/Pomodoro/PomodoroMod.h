@@ -49,13 +49,13 @@ private:
 public:
     PomodoroMod(bool _isOffline = false);
 
-    void init(void);
-    void pause(void);
-    void btnA_pressed(void);
-    void btnB_pressed(void);
-    void btnC_pressed(void);
-    void display_touched(int16_t x, int16_t y);
-    void idle(void);
+    void init(void) override;
+    void pause(void) override;
+    void btnA_pressed(void) override;
+    void btnB_pressed(void) override;
+    void btnC_pressed(void) override;
+    void display_touched(int16_t x, int16_t y) override;
+    void idle(void) override;
 
 private:
     void triggerNotification(void);

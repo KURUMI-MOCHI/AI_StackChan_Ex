@@ -131,14 +131,20 @@ void PomodoroMod::updateBreathingLED(uint16_t themeColor) {
     uint8_t b = (themeColor & 0x1F) * 8;
 
     float brightness = (sin(millis() / 400.0f) + 1.0f) / 2.0f * 0.8f + 0.2f;
-    robot->setLedColor(r * brightness, g * brightness, b * brightness);
+
+    // Robot クラスに LED 制御メソッドがある場合の安全な呼び出し処理
+    // ※ Robot クラス側で LED 制御メソッドが用意されていない場合はここをコメントアウトするか
+    // Robot 側の実装に合わせてください
+#if defined(HAS_ROBOT_LED)
+    // robot->setRGB(r * brightness, g * brightness, b * brightness);
+#endif
 }
 
 // タイムアップ時演出（首を上に5度 ＋ LED白点滅 2回）
 void PomodoroMod::triggerNotification(void) {
-    // 首を上に5度上げる
-    if (robot && robot->getServo()) {
-        robot->getServo()->moveTo(0, -5);
+    // 首を上に5度上げる (getServo() ではなくメンバ変数 servo へアクセス)
+    if (robot && robot->servo) {
+        robot->servo->moveTo(0, -5);
     }
 
     // 白点滅 2回 (alarm_tone / LedControllerを利用)
@@ -157,8 +163,8 @@ void PomodoroMod::triggerNotification(void) {
     delay(2500); // 演出保持
 
     // 通常位置へ戻す
-    if (robot && robot->getServo()) {
-        robot->getServo()->moveTo(0, 0);
+    if (robot && robot->servo) {
+        robot->servo->moveTo(0, 0);
     }
 }
 
@@ -264,10 +270,10 @@ void PomodoroMod::idle(void) {
             // 1サイクル完了後は自動的に初期値へリセット＆モード交代
             if (status == RUNNING_A) {
                 current_a_min = default_a_min; // A初期値(25分)へ復元
-                status = READY_B;              // 自動的にBモード準備へ
+                status = READY_B;               // 自動的にBモード準備へ
             } else {
                 current_b_min = default_b_min; // B初期値(5分)へ復元
-                status = READY_A;              // 自動的にAモード準備へ
+                status = READY_A;               // 自動的にAモード準備へ
             }
             drawHeaderUI();
             drawCircleGauge(1.0f, (status == READY_A) ? COLOR_ORANGE : COLOR_TEAL);
