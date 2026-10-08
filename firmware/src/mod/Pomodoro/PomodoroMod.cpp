@@ -13,7 +13,7 @@ extern void alarm_tone();
 ///////////////
 
 // オーバーレイ描画エントリーポイント（Avatarの描画ループ内から呼ばれる）
-void PomodoroOverlay::draw(m5avatar::M5Canvas *canvas, m5avatar::BoundingRect rect) {
+void PomodoroOverlay::draw(M5Canvas *canvas, m5avatar::BoundingRect rect) {
     if (mod) {
         mod->drawOverlayUI(canvas);
     }
@@ -41,8 +41,8 @@ void PomodoroMod::init(void) {
     current_b_min = default_b_min;
     is_active = true;
 
-    avatar.setSpeechText(""); // 吹き出しクリア
-    avatar.addFeature(&overlay); // Avatarの描画レイヤーにポモドーロUIを追加
+    avatar.setSpeechText("");   // 吹き出しクリア
+    avatar.addEffect(&overlay); // Avatarのエフェクト（重ね描画）レイヤーに追加
 }
 
 void PomodoroMod::pause(void) {
@@ -68,7 +68,7 @@ void PomodoroMod::btnC_pressed(void) {
 }
 
 // Avatarのキャンバス（背景顔描画完了後）に対する前面オーバーレイ描画
-void PomodoroMod::drawOverlayUI(m5avatar::M5Canvas *canvas) {
+void PomodoroMod::drawOverlayUI(M5Canvas *canvas) {
     if (!is_active || !canvas) return;
 
     uint16_t theme_color = (status == RUNNING_A || status == PAUSED_A || status == READY_A) ? COLOR_ORANGE : COLOR_TEAL;
@@ -157,7 +157,7 @@ void PomodoroMod::updateBreathingLED(uint16_t themeColor) {
     float brightness = (sin(millis() / 400.0f) + 1.0f) / 2.0f * 0.8f + 0.2f;
 }
 
-// タイムアップ時演出（首を上に5度 ＋ 画面フラッシュ）
+// タイムアップ時演出（首を上に5度 ＋ アラーム音）
 void PomodoroMod::triggerNotification(void) {
     if (robot && robot->servo) {
         robot->servo->moveTo(0, -5);

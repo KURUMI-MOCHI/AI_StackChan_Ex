@@ -24,20 +24,21 @@ typedef enum {
 
 class PomodoroMod;
 
-// Avatarの描画キャンバス上に重ね描画するためのオーバーレイ描画クラス
-class PomodoroOverlay : public m5avatar::Drawable {
+// Avatarの描画キャンバス上に重ね描画するためのエフェクトクラス
+class PomodoroOverlay : public m5avatar::Effect {
 private:
     PomodoroMod* mod;
 public:
     PomodoroOverlay(PomodoroMod* _mod) : mod(_mod) {}
-    void draw(m5avatar::M5Canvas *canvas, m5avatar::BoundingRect rect) override;
+    void draw(M5Canvas *canvas, m5avatar::BoundingRect rect) override;
 };
 
 class PomodoroMod : public ModBase {
 private:
     box_t box_top_A;  // 左上 (Aモード設定・リセット)
     box_t box_top_B;  // 右上 (Bモード設定・リセット)
-    box_t box_center; // 画面中央 (スタート / 一時停止)
+    box_center.setupBox(50, 50, 220, 140); // 中央 (スタート/一時停止)
+    box_t box_center;
 
     PomodoroStatus status;
     bool isOffline;
@@ -74,7 +75,7 @@ public:
     void idle(void) override;
 
     // Avatarキャンバスへのオーバーレイ描画用関数
-    void drawOverlayUI(m5avatar::M5Canvas *canvas);
+    void drawOverlayUI(M5Canvas *canvas);
 
 private:
     void triggerNotification(void);
