@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include "mod/ModBase.h"
+#include <Avatar.h>
 
 // テーマカラー定義 (RGB565)
 #define COLOR_ORANGE  0xFDA0  // モードA (オレンジ)
@@ -21,6 +22,17 @@ typedef enum {
     PAUSED_B
 } PomodoroStatus;
 
+class PomodoroMod;
+
+// Avatarの描画キャンバス上に重ね描画するためのオーバーレイ描画クラス
+class PomodoroOverlay : public m5avatar::Drawable {
+private:
+    PomodoroMod* mod;
+public:
+    PomodoroOverlay(PomodoroMod* _mod) : mod(_mod) {}
+    void draw(m5avatar::M5Canvas *canvas, m5avatar::BoundingRect rect) override;
+};
+
 class PomodoroMod : public ModBase {
 private:
     box_t box_top_A;  // 左上 (Aモード設定・リセット)
@@ -34,17 +46,21 @@ private:
     // 時間設定 (分)
     uint32_t default_a_min;
     uint32_t default_b_min;
-    uint32_t current_a_min; // 今サイクルの設定時間
+    uint32_t current_a_min;
     uint32_t current_b_min;
 
     // タイマー計測用
     uint32_t start_time_ms;
     uint32_t total_duration_ms;
-    uint32_t paused_remaining_ms; // 一時停止時の残り時間
+    uint32_t paused_remaining_ms;
 
     // スライド操作用
     int16_t last_touch_y;
     bool is_sliding;
+
+    // オーバーレイ描画管理
+    PomodoroOverlay overlay;
+    bool is_active;
 
 public:
     PomodoroMod(bool _isOffline = false);
@@ -57,10 +73,11 @@ public:
     void display_touched(int16_t x, int16_t y) override;
     void idle(void) override;
 
+    // Avatarキャンバスへのオーバーレイ描画用関数
+    void drawOverlayUI(m5avatar::M5Canvas *canvas);
+
 private:
     void triggerNotification(void);
-    void drawCircleGauge(float ratio, uint16_t color);
-    void drawHeaderUI(void);
     void updateBreathingLED(uint16_t themeColor);
 };
 
