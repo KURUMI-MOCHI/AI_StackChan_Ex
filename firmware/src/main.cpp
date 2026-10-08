@@ -463,10 +463,10 @@ ModBase* init_mod(void)
     add_mod(new AiStackChanMod(isOffline));
 #endif
   }
+  add_mod(new PomodoroMod(isOffline));
   add_mod(new StatusMonitorMod());
   add_mod(new VolumeSettingMod());
   //add_mod(new EspNowRemoteMod());
-  //add_mod(new PomodoroMod(isOffline));
   //add_mod(new PhotoFrameMod(isOffline));
   //add_mod(new QRdisplayMod());
   add_mod(new OyasumiMod()); // ★追加
