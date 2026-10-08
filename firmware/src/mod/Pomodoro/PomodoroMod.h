@@ -7,9 +7,9 @@
 #include <M5GFX.h>
 
 // テーマカラー定義 (RGB565)
-#define COLOR_ORANGE  0xFDA0  // モードA (オレンジ)
-#define COLOR_TEAL    0x0410  // モードB (ティール)
-#define COLOR_GRAY    0x39E7  // 消滅後・背景用グレー
+#define COLOR_ORANGE   0xFDA0  // モードA (オレンジ)
+#define COLOR_TEAL     0x0410  // モードB (ティール)
+#define COLOR_GRAY     0x39E7  // 消滅後・背景用グレー
 
 #define DEFAULT_A_MIN 25
 #define DEFAULT_B_MIN 5
@@ -31,7 +31,8 @@ private:
     PomodoroMod* mod;
 public:
     PomodoroOverlay(PomodoroMod* _mod) : mod(_mod) {}
-    void draw(M5Canvas *canvas, m5avatar::BoundingRect rect) override;
+    // 引数を参照渡しに変更してオーバーライドを正しく成立させる
+    void draw(M5Canvas *canvas, const m5avatar::BoundingRect rect) override;
 };
 
 class PomodoroMod : public ModBase {

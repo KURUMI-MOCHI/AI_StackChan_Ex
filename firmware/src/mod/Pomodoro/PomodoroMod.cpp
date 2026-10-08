@@ -12,8 +12,8 @@ extern void sw_tone();
 extern void alarm_tone();
 ///////////////
 
-// Drawable::draw のオーバーライド実装
-void PomodoroOverlay::draw(M5Canvas *canvas, m5avatar::BoundingRect rect) {
+// Drawable::draw のオーバーライド実装（シグネチャを合わせる）
+void PomodoroOverlay::draw(M5Canvas *canvas, const m5avatar::BoundingRect rect) {
     if (mod && canvas) {
         mod->drawOverlayUI(canvas);
     }
@@ -30,9 +30,9 @@ PomodoroMod::PomodoroMod(bool _isOffline)
     status = READY_A;
 
     // タッチ領域定義（コンストラクタ内で初期化）
-    box_top_A.setupBox(0, 0, 100, 50);       // 左上 A領域
-    box_top_B.setupBox(220, 0, 100, 50);     // 右上 B領域
-    box_center.setupBox(50, 50, 220, 140);   // 中央（顔エリア）
+    box_top_A.setupBox(0, 0, 100, 50);        // 左上 A領域
+    box_top_B.setupBox(220, 0, 100, 50);      // 右上 B領域
+    box_center.setupBox(50, 50, 220, 140);    // 中央（顔エリア）
 }
 
 void PomodoroMod::init(void) {
@@ -43,8 +43,8 @@ void PomodoroMod::init(void) {
 
     avatar.setSpeechText("");
     
-    // Avatar の描画レイヤー（Feature / Drawable）に追加
-    avatar.addFeature(&overlay);
+    // Avatar の描画レイヤー（Drawable）に追加（addFeature -> addDrawable）
+    avatar.addDrawable(&overlay);
 }
 
 void PomodoroMod::pause(void) {
