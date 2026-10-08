@@ -23,18 +23,6 @@ typedef enum {
     PAUSED_B
 } PomodoroStatus;
 
-class PomodoroMod;
-
-// m5avatar::Drawable を継承して画面重ね描画を作成
-class PomodoroOverlay : public m5avatar::Drawable {
-private:
-    PomodoroMod* mod;
-public:
-    PomodoroOverlay(PomodoroMod* _mod) : mod(_mod) {}
-    // 引数を参照渡しに変更してオーバーライドを正しく成立させる
-    void draw(M5Canvas *canvas, const m5avatar::BoundingRect rect) override;
-};
-
 class PomodoroMod : public ModBase {
 private:
     box_t box_top_A;  // 左上 (Aモード設定・リセット)
@@ -60,8 +48,6 @@ private:
     int16_t last_touch_y;
     bool is_sliding;
 
-    // オーバーレイ描画管理
-    PomodoroOverlay overlay;
     bool is_active;
 
 public:
@@ -75,7 +61,7 @@ public:
     void display_touched(int16_t x, int16_t y) override;
     void idle(void) override;
 
-    // Avatarキャンバスへのオーバーレイ描画用関数
+    // 画面描画用関数（必要に応じて外部やループから呼ぶ、またはM5.Displayへ描画）
     void drawOverlayUI(M5Canvas *canvas);
 
 private:
