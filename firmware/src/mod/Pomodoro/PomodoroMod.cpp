@@ -8,12 +8,14 @@ using namespace m5avatar;
 /// 外部参照 ///
 extern Avatar avatar;
 extern Robot *robot;
+extern bool servo_home;
 extern void sw_tone();
 extern void alarm_tone();
 ///////////////
 
 PomodoroMod::PomodoroMod(bool _isOffline)
-  : isOffline{_isOffline}, isSilentMode{true}, last_touch_y{-1}
+  : isOffline{_isOffline}, isSilentMode{true}, last_touch_y{-1},
+    headTouchHappyActive{false}, headTouchHappyUntilMs{0}, prev_servo_home_state{true}
 {
     default_a_min = DEFAULT_A_MIN;
     default_b_min = DEFAULT_B_MIN;
@@ -21,10 +23,9 @@ PomodoroMod::PomodoroMod(bool _isOffline)
     current_b_min = default_b_min;
     status = READY_A;
 
-    // タッチ領域定義
-    box_top_A.setupBox(0, 0, 100, 50);        // 左上 A領域
-    box_top_B.setupBox(220, 0, 100, 50);      // 右上 B領域
-    box_center.setupBox(50, 50, 220, 140);    // 中央（顔エリア）
+    box_top_A.setupBox(0, 0, 100, 50);
+    box_top_B.setupBox(220, 0, 100, 50);
+    box_center.setupBox(50, 50, 220, 140);
 }
 
 void PomodoroMod::init(void) {
@@ -33,6 +34,7 @@ void PomodoroMod::init(void) {
     current_b_min = default_b_min;
 
     avatar.setSpeechText("");
+    updateLEDState();
     update();
     avatar.set_isSubWindowEnable(true);
 }
@@ -40,22 +42,23 @@ void PomodoroMod::init(void) {
 void PomodoroMod::pause(void) {
     avatar.set_isSubWindowEnable(false);
     avatar.setSpeechText("");
+    LedController.setEmotion(LedEmotion::NORMAL);
     if (status == RUNNING_A || status == RUNNING_B) {
         status = (status == RUNNING_A) ? PAUSED_A : PAUSED_B;
     }
 }
 
 void PomodoroMod::btnA_pressed(void) {
-    sw_tone();
+    LedController.flashFeedback();
     display_touched(160, 120);
 }
 
 void PomodoroMod::btnB_pressed(void) {
-    sw_tone();
+    LedController.flashFeedback();
 }
 
 void PomodoroMod::btnC_pressed(void) {
-    sw_tone();
+    LedController.flashFeedback();
     isSilentMode = !isSilentMode;
 }
 
@@ -64,29 +67,33 @@ void PomodoroMod::drawSubWindow(M5Canvas *spi, BoundingRect rect, DrawContext *c
     static_cast<PomodoroMod*>(userData)->drawPomodoroUI(spi, rect, ctx);
 }
 
-// 顔を潰さず、円形インジケーターと上部UIをオーバーレイ描画
 void PomodoroMod::drawPomodoroUI(M5Canvas *spi, BoundingRect rect, DrawContext *ctx) {
-    uint16_t theme_color = (status == RUNNING_A || status == PAUSED_A || status == READY_A) ? COLOR_ORANGE : COLOR_TEAL;
-    float ratio = 1.0f;
+    bool isModeA = (status == RUNNING_A || status == PAUSED_A || status == READY_A);
+    uint16_t theme_color = isModeA ? COLOR_ORANGE : COLOR_TEAL;
 
-    // 残り時間割合計算
+    uint32_t target_total_min = isModeA ? current_a_min : current_b_min;
+    uint32_t remaining_sec = 0;
+
     if (status == RUNNING_A || status == RUNNING_B) {
         uint32_t elapsed = millis() - start_time_ms;
         if (elapsed < total_duration_ms) {
-            ratio = 1.0f - ((float)elapsed / (float)total_duration_ms);
-        } else {
-            ratio = 0.0f;
+            remaining_sec = (total_duration_ms - elapsed) / 1000;
         }
     } else if (status == PAUSED_A || status == PAUSED_B) {
-        ratio = (float)paused_remaining_ms / (float)total_duration_ms;
+        remaining_sec = paused_remaining_ms / 1000;
+    } else {
+        remaining_sec = target_total_min * 60;
     }
 
-    // --- 1. 円形インジケーター描画 (外周 r=104〜118) ---
+    // 1分ごとに1目盛り減る仕様 (全60分割のセグメント)
+    int active_bars = (remaining_sec + 59) / 60;
+    if (active_bars > 60) active_bars = 60;
+
+    // --- 1. 太めの円形インジケーター描画 (r=100〜118) ---
     int cx = 160;
     int cy = 120;
     int r_outer = 118;
-    int r_inner = 104;
-    int active_bars = (int)(60.0f * ratio);
+    int r_inner = 100;
 
     for (int i = 0; i < 60; i++) {
         float angle = (-90.0f + i * 6.0f) * DEG_TO_RAD;
@@ -98,59 +105,46 @@ void PomodoroMod::drawPomodoroUI(M5Canvas *spi, BoundingRect rect, DrawContext *
         int y2 = cy + sin(angle) * r_outer;
 
         spi->drawLine(x1, y1, x2, y2, c);
+        spi->drawLine(x1 + (cos(angle)*0.5f), y1 + (sin(angle)*0.5f), x2, y2, c);
     }
 
-    // --- 2. 上部ヘッダーUI描画 (A, B) ---
-    spi->setTextSize(2);
+    // --- 2. 上部ヘッダーUI描画 (A, Bの「分:秒」詳細表示) ---
+    spi->setTextSize(1.5); // 少し文字を小さくして秒数が入るように調整
     spi->setTextColor(TFT_WHITE, TFT_BLACK);
 
-    String textA = "A";
-    if (status == RUNNING_A) {
-        uint32_t elapsed = millis() - start_time_ms;
-        uint32_t remaining_sec = (total_duration_ms > elapsed) ? (total_duration_ms - elapsed) / 1000 : 0;
-        uint32_t remaining_min = (remaining_sec / 60) + 1;
-        textA += ":" + String(remaining_min);
-    } else if (status == PAUSED_A) {
-        uint32_t remaining_min = (paused_remaining_ms / 1000 / 60) + 1;
-        textA += ":" + String(remaining_min);
-    } else if (status == READY_A) {
-        textA += ":" + String(current_a_min);
-    }
+    uint32_t disp_min = remaining_sec / 60;
+    uint32_t disp_sec = remaining_sec % 60;
+    char sec_buf[8];
+    sprintf(sec_buf, "%02u", disp_sec);
 
-    String textB = "B";
-    if (status == RUNNING_B) {
-        uint32_t elapsed = millis() - start_time_ms;
-        uint32_t remaining_sec = (total_duration_ms > elapsed) ? (total_duration_ms - elapsed) / 1000 : 0;
-        uint32_t remaining_min = (remaining_sec / 60) + 1;
-        textB += ":" + String(remaining_min);
-    } else if (status == PAUSED_B) {
-        uint32_t remaining_min = (paused_remaining_ms / 1000 / 60) + 1;
-        textB += ":" + String(remaining_min);
-    } else if (status == READY_B) {
-        textB += ":" + String(current_b_min);
-    }
+    String textA = "A:" + String(status == RUNNING_A || status == PAUSED_A || status == READY_A ? String(disp_min) + ":" + sec_buf : String(current_a_min) + ":00");
+    String textB = "B:" + String(status == RUNNING_B || status == PAUSED_B || status == READY_B ? String(disp_min) + ":" + sec_buf : String(current_b_min) + ":00");
 
-    // 黒背景でクリアしてから描画
-    spi->fillRect(0, 0, 90, 24, TFT_BLACK);
-    spi->fillRect(230, 0, 90, 24, TFT_BLACK);
+    // 文字幅に合わせてクリアエリアを少し広げる (110ピクセル)
+    spi->fillRect(0, 0, 110, 24, TFT_BLACK);
+    spi->fillRect(210, 0, 110, 24, TFT_BLACK);
 
-    spi->drawString(textA.c_str(), 5, 4);
-    spi->drawString(textB.c_str(), 235, 4);
+    spi->drawString(textA.c_str(), 5, 6);
+    spi->drawString(textB.c_str(), 215, 6);
 }
 
 void PomodoroMod::update(void) {
     avatar.updateSubWindowCustom(PomodoroMod::drawSubWindow, this, 0, 0, 320, 240);
 }
 
-void PomodoroMod::updateBreathingLED(uint16_t themeColor) {
-    if (!robot) return;
-    float brightness = (sin(millis() / 400.0f) + 1.0f) / 2.0f * 0.8f + 0.2f;
+void PomodoroMod::updateLEDState(void) {
+    if (status == RUNNING_A || status == READY_A || status == PAUSED_A) {
+        LedController.setEmotion(LedEmotion::HAPPY);
+    } else {
+        LedController.setEmotion(LedEmotion::CALM);
+    }
 }
 
 void PomodoroMod::triggerNotification(void) {
     if (robot && robot->servo) {
         robot->servo->moveTo(0, -5);
     }
+    LedController.flashFeedback();
     if (!isSilentMode) {
         alarm_tone();
     }
@@ -160,28 +154,58 @@ void PomodoroMod::triggerNotification(void) {
     }
 }
 
+void PomodoroMod::updateHeadTouchExpression(void) {
+    HeadTouchSensor::Gesture gesture = HeadTouchSensor::update();
+
+    if (HeadTouchSensor::isPetGesture(gesture)) {
+        if (!headTouchHappyActive) {
+            headTouchHappyActive = true;
+            prev_servo_home_state = servo_home;
+            servo_home = false;
+
+            avatar.setExpression(Expression::Happy);
+            LedController.setEmotion(LedEmotion::HAPPY);
+
+            if (robot != nullptr && robot->servo != nullptr) {
+                robot->servo->moveTo(0, -5);
+            }
+        }
+        headTouchHappyUntilMs = millis() + 3000;
+    }
+
+    if (headTouchHappyActive && millis() >= headTouchHappyUntilMs) {
+        headTouchHappyActive = false;
+        avatar.setExpression(Expression::Neutral);
+        updateLEDState();
+
+        if (robot != nullptr && robot->servo != nullptr) {
+            robot->servo->moveToOrigin();
+        }
+        servo_home = prev_servo_home_state;
+    }
+}
+
 void PomodoroMod::display_touched(int16_t x, int16_t y) {
-    // 1. 左上タップ：Aモードリセット
     if (box_top_A.contain(x, y)) {
-        sw_tone();
+        LedController.flashFeedback();
         current_a_min = default_a_min;
         status = READY_A;
+        updateLEDState();
         update();
         return;
     }
 
-    // 2. 右上タップ：Bモードリセット
     if (box_top_B.contain(x, y)) {
-        sw_tone();
+        LedController.flashFeedback();
         current_b_min = default_b_min;
         status = READY_B;
+        updateLEDState();
         update();
         return;
     }
 
-    // 3. 中央タップ：スタート / 一時停止
     if (box_center.contain(x, y)) {
-        sw_tone();
+        LedController.flashFeedback();
         if (status == READY_A) {
             start_time_ms = millis();
             total_duration_ms = current_a_min * 60 * 1000;
@@ -203,11 +227,12 @@ void PomodoroMod::display_touched(int16_t x, int16_t y) {
             start_time_ms = millis() - (total_duration_ms - paused_remaining_ms);
             status = RUNNING_B;
         }
+        updateLEDState();
         update();
         return;
     }
 
-    // 4. 画面両端スライド：時間変更 (READY または PAUSED 時)
+    // スライド操作での時間変更
     if (status == READY_A || status == PAUSED_A || status == READY_B || status == PAUSED_B) {
         if (x < 40 || x > 280) {
             auto touch_detail = M5.Touch.getDetail();
@@ -244,21 +269,28 @@ void PomodoroMod::display_touched(int16_t x, int16_t y) {
 }
 
 void PomodoroMod::idle(void) {
+    updateHeadTouchExpression();
     update();
 
-    if (status == RUNNING_A || status == RUNNING_B) {
+    if (status == RUNNING_A || status == RUNning_B) {
         uint32_t elapsed = millis() - start_time_ms;
 
         if (elapsed >= total_duration_ms) {
             triggerNotification();
 
+            // A終了 -> すぐにBスタート、 B終了 -> すぐにAスタート
             if (status == RUNNING_A) {
-                current_a_min = default_a_min;
-                status = READY_B;
-            } else {
                 current_b_min = default_b_min;
-                status = READY_A;
+                start_time_ms = millis();
+                total_duration_ms = current_b_min * 60 * 1000;
+                status = RUNNING_B;
+            } else {
+                current_a_min = default_a_min;
+                start_time_ms = millis();
+                total_duration_ms = current_a_min * 60 * 1000;
+                status = RUNNING_A;
             }
+            updateLEDState();
             update();
         }
     }

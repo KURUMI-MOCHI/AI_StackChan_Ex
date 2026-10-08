@@ -5,6 +5,8 @@
 #include "mod/ModBase.h"
 #include <Avatar.h>
 #include <M5GFX.h>
+#include "HeadTouchSensor.h"
+#include "LedController.h"
 
 #define COLOR_ORANGE   0xFDA0  // モードA (オレンジ)
 #define COLOR_TEAL     0x0410  // モードB (ティール)
@@ -24,27 +26,29 @@ typedef enum {
 
 class PomodoroMod : public ModBase {
 private:
-    box_t box_top_A;  // 左上 (Aモードリセット)
-    box_t box_top_B;  // 右上 (Bモードリセット)
-    box_t box_center; // 中央 (スタート/一時停止)
+    box_t box_top_A;
+    box_t box_top_B;
+    box_t box_center;
 
     PomodoroStatus status;
     bool isOffline;
     bool isSilentMode;
 
-    // 時間設定 (分)
     uint32_t default_a_min;
     uint32_t default_b_min;
     uint32_t current_a_min;
     uint32_t current_b_min;
 
-    // タイマー計測用
     uint32_t start_time_ms;
     uint32_t total_duration_ms;
     uint32_t paused_remaining_ms;
 
-    // スライド操作用
     int16_t last_touch_y;
+
+    // 頭頂部なでなでリアクション用変数
+    bool headTouchHappyActive;
+    uint32_t headTouchHappyUntilMs;
+    bool prev_servo_home_state;
 
 public:
     PomodoroMod(bool _isOffline = false);
@@ -62,7 +66,8 @@ public:
 
 private:
     void triggerNotification(void);
-    void updateBreathingLED(uint16_t themeColor);
+    void updateHeadTouchExpression(void);
+    void updateLEDState(void);
     static void drawSubWindow(M5Canvas *spi, m5avatar::BoundingRect rect, m5avatar::DrawContext *ctx, void *userData);
 };
 
