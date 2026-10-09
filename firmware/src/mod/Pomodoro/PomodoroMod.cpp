@@ -41,6 +41,7 @@ void PomodoroMod::pause(void) {
     avatar.set_isSubWindowEnable(false);
     avatar.setSpeechText("");
     LedController.setEmotion(LedEmotion::NORMAL);
+    LedController.setState(LedState::STANDBY);
     if (status == RUNNING_A || status == RUNNING_B) {
         status = (status == RUNNING_A) ? PAUSED_A : PAUSED_B;
     }
@@ -147,12 +148,16 @@ void PomodoroMod::update(void) {
     avatar.updateSubWindowCustom(PomodoroMod::drawSubWindow, this, 0, 0, 320, 240);
 }
 
+// LEDカラー設定（`setCustomStandbyColor` を使用）
 void PomodoroMod::updateLEDState(void) {
     if (status == RUNNING_A || status == READY_A || status == PAUSED_A) {
-        LedController.setRawColor(255, 100, 0);   // モードA: オレンジ
+        // モードA: オレンジ (R:255, G:60, B:0)
+        LedController.setCustomStandbyColor(255, 60, 0);
     } else {
-        LedController.setRawColor(0, 200, 160);   // モードB: ティールグリーン
+        // モードB: ティールグリーン (R:0, G:200, B:160)
+        LedController.setCustomStandbyColor(0, 200, 160);
     }
+    LedController.setState(LedState::STANDBY);
 }
 
 void PomodoroMod::triggerNotification(void) {
