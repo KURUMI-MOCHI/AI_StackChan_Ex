@@ -12,7 +12,7 @@ extern bool servo_home;
 ///////////////
 
 PomodoroMod::PomodoroMod(bool _isOffline)
-  : isOffline{_isOffline}, is_sliding{false}, touch_start_y{-1}, slide_base_min{25},
+  : isOffline{_isOffline}, is_dial_dragging{false},
     headTouchHappyActive{false}, headTouchHappyUntilMs{0}, prev_servo_home_state{true}
 {
     default_a_min = DEFAULT_A_MIN;
@@ -21,9 +21,9 @@ PomodoroMod::PomodoroMod(bool _isOffline)
     current_b_min = default_b_min;
     status = READY_A;
 
-    box_top_A.setupBox(0, 0, 100, 50);
-    box_top_B.setupBox(220, 0, 100, 50);
-    box_center.setupBox(50, 50, 220, 140);
+    box_top_A.setupBox(20, 20, 80, 40);
+    box_top_B.setupBox(220, 20, 80, 40);
+    box_center.setupBox(80, 60, 160, 120);
 }
 
 void PomodoroMod::init(void) {
@@ -82,46 +82,65 @@ void PomodoroMod::drawPomodoroUI(M5Canvas *spi, BoundingRect rect, DrawContext *
         remaining_sec = target_total_min * 60;
     }
 
-    // 1分ごとに1目盛り (最大60分割)
+    // 残り分数の計算 (1分刻み)
     int active_bars = (remaining_sec + 59) / 60;
     if (active_bars > MAX_MIN) active_bars = MAX_MIN;
 
-    // --- 1. 太めの円形インジケーター描画 (r=100〜118) ---
-    int cx = 160;
-    int cy = 120;
-    int r_outer = 118;
-    int r_inner = 100;
+    // --- 1. 画面外周に沿った角丸四角形インジケーター (60分割) ---
+    const float total_len = 1056.0f;
+    const float step_len = total_len / 60.0f;
+    const int bar_size = 16;
 
-    for (int i = 0; i < 60; i++) {
-        float angle = (-90.0f + i * 6.0f) * DEG_TO_RAD;
-        uint16_t c = (i < active_bars) ? theme_color : COLOR_GRAY;
+    for (int i = 1; i <= 60; i++) {
+        uint16_t c = (i <= active_bars) ? theme_color : COLOR_GRAY;
 
-        int x1 = cx + cos(angle) * r_inner;
-        int y1 = cy + sin(angle) * r_inner;
-        int x2 = cx + cos(angle) * r_outer;
-        int y2 = cy + sin(angle) * r_outer;
+        float d = i * step_len;
+        int x1 = 0, y1 = 0, x2 = 0, y2 = 0;
+
+        if (d <= 152.0f) { // 上辺（右半分）
+            x1 = 160 + (int)d; y1 = 8;
+            x2 = x1;           y2 = y1 + bar_size;
+        } else if (d <= 376.0f) { // 右辺
+            x1 = 312;          y1 = 8 + (int)(d - 152.0f);
+            x2 = x1 - bar_size; y2 = y1;
+        } else if (d <= 680.0f) { // 下辺
+            x1 = 312 - (int)(d - 376.0f); y1 = 232;
+            x2 = x1;                      y2 = y1 - bar_size;
+        } else if (d <= 904.0f) { // 左辺
+            x1 = 8;            y1 = 232 - (int)(d - 680.0f);
+            x2 = x1 + bar_size; y2 = y1;
+        } else { // 上辺（左半分）
+            x1 = 8 + (int)(d - 904.0f); y1 = 8;
+            x2 = x1;                    y2 = y1 + bar_size;
+        }
 
         spi->drawLine(x1, y1, x2, y2, c);
-        spi->drawLine(x1 + (cos(angle) * 0.5f), y1 + (sin(angle) * 0.5f), x2, y2, c);
+        if (x1 == x2) {
+            spi->drawLine(x1 + 1, y1, x2 + 1, y2, c);
+        } else {
+            spi->drawLine(x1, y1 + 1, x2, y2 + 1, c);
+        }
     }
 
-    // --- 2. 上部ヘッダーUI描画 (A, Bの「分:秒」表示) ---
-    spi->setTextSize(1.5);
+    // --- 2. 内側にシフトした上部ヘッダーUI ---
+    spi->setTextSize(2);
     spi->setTextColor(TFT_WHITE, TFT_BLACK);
 
-    uint32_t disp_min = remaining_sec / 60;
-    uint32_t disp_sec = remaining_sec % 60;
-    char sec_buf[8];
-    sprintf(sec_buf, "%02u", disp_sec);
+    uint32_t disp_min = (remaining_sec + 59) / 60;
+    if (status == READY_A) disp_min = current_a_min;
+    if (status == READY_B) disp_min = current_b_min;
 
-    String textA = "A:" + String(status == RUNNING_A || status == PAUSED_A || status == READY_A ? String(disp_min) + ":" + sec_buf : String(current_a_min) + ":00");
-    String textB = "B:" + String(status == RUNNING_B || status == PAUSED_B || status == READY_B ? String(disp_min) + ":" + sec_buf : String(current_b_min) + ":00");
+    String textA = "A:" + String(isModeA ? disp_min : current_a_min);
+    if (status == RUNNING_A) textA += "...";
 
-    spi->fillRect(0, 0, 110, 24, TFT_BLACK);
-    spi->fillRect(210, 0, 110, 24, TFT_BLACK);
+    String textB = "B:" + String(!isModeA ? disp_min : current_b_min);
+    if (status == RUNNING_B) textB += "...";
 
-    spi->drawString(textA.c_str(), 5, 6);
-    spi->drawString(textB.c_str(), 215, 6);
+    spi->fillRect(20, 24, 85, 24, TFT_BLACK);
+    spi->fillRect(210, 24, 85, 24, TFT_BLACK);
+
+    spi->drawString(textA.c_str(), 25, 26);
+    spi->drawString(textB.c_str(), 215, 26);
 }
 
 void PomodoroMod::update(void) {
@@ -130,13 +149,12 @@ void PomodoroMod::update(void) {
 
 void PomodoroMod::updateLEDState(void) {
     if (status == RUNNING_A || status == READY_A || status == PAUSED_A) {
-        LedController.setEmotion(LedEmotion::HAPPY);
+        LedController.setRawColor(255, 100, 0);   // モードA: オレンジ
     } else {
-        LedController.setEmotion(LedEmotion::NORMAL);
+        LedController.setRawColor(0, 200, 160);   // モードB: ティールグリーン
     }
 }
 
-// タイムアップ時通知（LEDフラッシュのみ・音なし）
 void PomodoroMod::triggerNotification(void) {
     if (robot && robot->servo) {
         robot->servo->moveTo(0, -5);
@@ -179,8 +197,57 @@ void PomodoroMod::updateHeadTouchExpression(void) {
     }
 }
 
+// タッチ座標から 1〜60分 の数値を計算
+uint32_t PomodoroMod::getMinuteFromTouchPos(int16_t x, int16_t y) {
+    float d = 0;
+    if (y < 40) { // 上辺
+        if (x >= 160) d = x - 160;
+        else d = 1056 - (160 - x);
+    } else if (x > 260) { // 右辺
+        d = 152 + (y - 8);
+    } else if (y > 200) { // 下辺
+        d = 376 + (312 - x);
+    } else { // 左辺
+        d = 680 + (232 - y);
+    }
+
+    int min_val = (int)round(d / (1056.0f / 60.0f));
+    if (min_val < 1) min_val = 1;
+    if (min_val > MAX_MIN) min_val = MAX_MIN;
+    return min_val;
+}
+
+// 現在のモードに対してダイヤル位置の分数を適用（リアルタイム更新）
+void PomodoroMod::handleDialTouch(int16_t x, int16_t y) {
+    if (status != READY_A && status != PAUSED_A && status != READY_B && status != PAUSED_B) {
+        return;
+    }
+
+    uint32_t selected_min = getMinuteFromTouchPos(x, y);
+
+    if (status == READY_A || status == PAUSED_A) {
+        if (current_a_min != selected_min) {
+            current_a_min = selected_min;
+            if (status == PAUSED_A) {
+                paused_remaining_ms = current_a_min * 60 * 1000;
+                total_duration_ms = paused_remaining_ms;
+            }
+            update();
+        }
+    } else if (status == READY_B || status == PAUSED_B) {
+        if (current_b_min != selected_min) {
+            current_b_min = selected_min;
+            if (status == PAUSED_B) {
+                paused_remaining_ms = current_b_min * 60 * 1000;
+                total_duration_ms = paused_remaining_ms;
+            }
+            update();
+        }
+    }
+}
+
 void PomodoroMod::display_touched(int16_t x, int16_t y) {
-    // 1. 左上タップ：Aモードをデフォルト値でリセット
+    // 1. 左上タップ：モードAに切り替えて標準値(25分)リセット
     if (box_top_A.contain(x, y)) {
         LedController.flashFeedback();
         current_a_min = default_a_min;
@@ -190,7 +257,7 @@ void PomodoroMod::display_touched(int16_t x, int16_t y) {
         return;
     }
 
-    // 2. 右上タップ：Bモードをデフォルト値でリセット
+    // 2. 右上タップ：モードBに切り替えて標準値(5分)リセット
     if (box_top_B.contain(x, y)) {
         LedController.flashFeedback();
         current_b_min = default_b_min;
@@ -228,60 +295,33 @@ void PomodoroMod::display_touched(int16_t x, int16_t y) {
         update();
         return;
     }
-
-    // 4. 両端スライド操作（カスタム時間設定・モード切替）
-    // 実行中でない（READYまたはPAUSED）場合にのみ有効
-    if (status == READY_A || status == PAUSED_A || status == READY_B || status == PAUSED_B) {
-        auto touch_detail = M5.Touch.getDetail();
-
-        if (touch_detail.isPressed()) {
-            if (!is_sliding) {
-                // スライド開始判定（左端: Aモード調整 / 右端: Bモード調整）
-                if (x < 50) {
-                    is_sliding = true;
-                    touch_start_y = touch_detail.y;
-                    status = READY_A;
-                    slide_base_min = current_a_min;
-                    updateLEDState();
-                } else if (x > 270) {
-                    is_sliding = true;
-                    touch_start_y = touch_detail.y;
-                    status = READY_B;
-                    slide_base_min = current_b_min;
-                    updateLEDState();
-                }
-            } else {
-                // スライド中のシームレス時間変化 (200px上スライドで +10分)
-                int16_t dy = touch_start_y - touch_detail.y; // 上に動かすとプラス
-                int delta_min = (int)round((float)dy / 20.0f); // 20px = 1分 (200px = 10分)
-
-                int new_min = (int)slide_base_min + delta_min;
-                if (new_min < 1) new_min = 1;
-                if (new_min > MAX_MIN) new_min = MAX_MIN;
-
-                if (status == READY_A || status == PAUSED_A) {
-                    current_a_min = new_min;
-                    if (status == PAUSED_A) {
-                        paused_remaining_ms = current_a_min * 60 * 1000;
-                        total_duration_ms = paused_remaining_ms;
-                    }
-                } else {
-                    current_b_min = new_min;
-                    if (status == PAUSED_B) {
-                        paused_remaining_ms = current_b_min * 60 * 1000;
-                        total_duration_ms = paused_remaining_ms;
-                    }
-                }
-                update();
-            }
-        } else {
-            is_sliding = false;
-        }
-    }
 }
 
 void PomodoroMod::idle(void) {
     updateHeadTouchExpression();
+
+    // 外周ダイヤルの追従スライド操作判定 (STOP/PAUSE時のみ)
+    if (status == READY_A || status == PAUSED_A || status == READY_B || status == PAUSED_B) {
+        auto touch_detail = M5.Touch.getDetail();
+        if (touch_detail.isPressed()) {
+            // ヘッダーボタンや顔中央以外を触っている時にダイヤル追従
+            if (!box_center.contain(touch_detail.x, touch_detail.y) &&
+                !box_top_A.contain(touch_detail.x, touch_detail.y) &&
+                !box_top_B.contain(touch_detail.x, touch_detail.y)) {
+
+                if (!is_dial_dragging) {
+                    LedController.flashFeedback();
+                    is_dial_dragging = true;
+                }
+                handleDialTouch(touch_detail.x, touch_detail.y);
+            }
+        } else {
+            is_dial_dragging = false;
+        }
+    } else {
+        is_dial_dragging = false;
+    }
+
     update();
 
     if (status == RUNNING_A || status == RUNNING_B) {
@@ -290,15 +330,15 @@ void PomodoroMod::idle(void) {
         if (elapsed >= total_duration_ms) {
             triggerNotification();
 
-            // タイムアップ時の切り替え（カスタム時間は1回限りのため標準値へリセットして復帰）
+            // タイムアップ時の自動切り替え（ワンショット適用後に標準値へ自動復帰）
             if (status == RUNNING_A) {
-                current_a_min = default_a_min; // Aを標準値に復元
+                current_a_min = default_a_min;
                 current_b_min = default_b_min;
                 start_time_ms = millis();
                 total_duration_ms = current_b_min * 60 * 1000;
                 status = RUNNING_B;
             } else {
-                current_b_min = default_b_min; // Bを標準値に復元
+                current_b_min = default_b_min;
                 current_a_min = default_a_min;
                 start_time_ms = millis();
                 total_duration_ms = current_a_min * 60 * 1000;
