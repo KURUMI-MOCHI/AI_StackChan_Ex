@@ -9,12 +9,10 @@ using namespace m5avatar;
 extern Avatar avatar;
 extern Robot *robot;
 extern bool servo_home;
-extern void sw_tone();
-extern void alarm_tone();
 ///////////////
 
 PomodoroMod::PomodoroMod(bool _isOffline)
-  : isOffline{_isOffline}, isSilentMode{true}, last_touch_y{-1},
+  : isOffline{_isOffline}, is_sliding{false}, touch_start_y{-1}, slide_base_min{25},
     headTouchHappyActive{false}, headTouchHappyUntilMs{0}, prev_servo_home_state{true}
 {
     default_a_min = DEFAULT_A_MIN;
@@ -59,7 +57,6 @@ void PomodoroMod::btnB_pressed(void) {
 
 void PomodoroMod::btnC_pressed(void) {
     LedController.flashFeedback();
-    isSilentMode = !isSilentMode;
 }
 
 void PomodoroMod::drawSubWindow(M5Canvas *spi, BoundingRect rect, DrawContext *ctx, void *userData) {
@@ -85,9 +82,9 @@ void PomodoroMod::drawPomodoroUI(M5Canvas *spi, BoundingRect rect, DrawContext *
         remaining_sec = target_total_min * 60;
     }
 
-    // 1分ごとに1目盛り減る仕様 (全60分割セグメント)
+    // 1分ごとに1目盛り (最大60分割)
     int active_bars = (remaining_sec + 59) / 60;
-    if (active_bars > 60) active_bars = 60;
+    if (active_bars > MAX_MIN) active_bars = MAX_MIN;
 
     // --- 1. 太めの円形インジケーター描画 (r=100〜118) ---
     int cx = 160;
@@ -108,7 +105,7 @@ void PomodoroMod::drawPomodoroUI(M5Canvas *spi, BoundingRect rect, DrawContext *
         spi->drawLine(x1 + (cos(angle) * 0.5f), y1 + (sin(angle) * 0.5f), x2, y2, c);
     }
 
-    // --- 2. 上部ヘッダーUI描画 (A, Bの「分:秒」詳細表示) ---
+    // --- 2. 上部ヘッダーUI描画 (A, Bの「分:秒」表示) ---
     spi->setTextSize(1.5);
     spi->setTextColor(TFT_WHITE, TFT_BLACK);
 
@@ -135,18 +132,16 @@ void PomodoroMod::updateLEDState(void) {
     if (status == RUNNING_A || status == READY_A || status == PAUSED_A) {
         LedController.setEmotion(LedEmotion::HAPPY);
     } else {
-        LedController.setEmotion(LedEmotion::CALM);
+        LedController.setEmotion(LedEmotion::NORMAL);
     }
 }
 
+// タイムアップ時通知（LEDフラッシュのみ・音なし）
 void PomodoroMod::triggerNotification(void) {
     if (robot && robot->servo) {
         robot->servo->moveTo(0, -5);
     }
     LedController.flashFeedback();
-    if (!isSilentMode) {
-        alarm_tone();
-    }
     delay(1000);
     if (robot && robot->servo) {
         robot->servo->moveTo(0, 0);
@@ -185,6 +180,7 @@ void PomodoroMod::updateHeadTouchExpression(void) {
 }
 
 void PomodoroMod::display_touched(int16_t x, int16_t y) {
+    // 1. 左上タップ：Aモードをデフォルト値でリセット
     if (box_top_A.contain(x, y)) {
         LedController.flashFeedback();
         current_a_min = default_a_min;
@@ -194,6 +190,7 @@ void PomodoroMod::display_touched(int16_t x, int16_t y) {
         return;
     }
 
+    // 2. 右上タップ：Bモードをデフォルト値でリセット
     if (box_top_B.contain(x, y)) {
         LedController.flashFeedback();
         current_b_min = default_b_min;
@@ -203,6 +200,7 @@ void PomodoroMod::display_touched(int16_t x, int16_t y) {
         return;
     }
 
+    // 3. 中央タップ：スタート / 一時停止
     if (box_center.contain(x, y)) {
         LedController.flashFeedback();
         if (status == READY_A) {
@@ -231,38 +229,53 @@ void PomodoroMod::display_touched(int16_t x, int16_t y) {
         return;
     }
 
-    // スライド操作での時間変更
+    // 4. 両端スライド操作（カスタム時間設定・モード切替）
+    // 実行中でない（READYまたはPAUSED）場合にのみ有効
     if (status == READY_A || status == PAUSED_A || status == READY_B || status == PAUSED_B) {
-        if (x < 40 || x > 280) {
-            auto touch_detail = M5.Touch.getDetail();
-            if (touch_detail.isPressed()) {
-                if (last_touch_y >= 0) {
-                    int16_t dy = touch_detail.y - last_touch_y;
-                    if (abs(dy) > 15) {
-                        if (status == READY_A || status == PAUSED_A) {
-                            if (dy < 0 && current_a_min < 99) current_a_min++;
-                            else if (dy > 0 && current_a_min > 1) current_a_min--;
-                            if (status == PAUSED_A) {
-                                paused_remaining_ms = current_a_min * 60 * 1000;
-                                total_duration_ms = paused_remaining_ms;
-                            }
-                        } else {
-                            if (dy < 0 && current_b_min < 99) current_b_min++;
-                            else if (dy > 0 && current_b_min > 1) current_b_min--;
-                            if (status == PAUSED_B) {
-                                paused_remaining_ms = current_b_min * 60 * 1000;
-                                total_duration_ms = paused_remaining_ms;
-                            }
-                        }
-                        last_touch_y = touch_detail.y;
-                        update();
-                    }
-                } else {
-                    last_touch_y = touch_detail.y;
+        auto touch_detail = M5.Touch.getDetail();
+
+        if (touch_detail.isPressed()) {
+            if (!is_sliding) {
+                // スライド開始判定（左端: Aモード調整 / 右端: Bモード調整）
+                if (x < 50) {
+                    is_sliding = true;
+                    touch_start_y = touch_detail.y;
+                    status = READY_A;
+                    slide_base_min = current_a_min;
+                    updateLEDState();
+                } else if (x > 270) {
+                    is_sliding = true;
+                    touch_start_y = touch_detail.y;
+                    status = READY_B;
+                    slide_base_min = current_b_min;
+                    updateLEDState();
                 }
             } else {
-                last_touch_y = -1;
+                // スライド中のシームレス時間変化 (200px上スライドで +10分)
+                int16_t dy = touch_start_y - touch_detail.y; // 上に動かすとプラス
+                int delta_min = (int)round((float)dy / 20.0f); // 20px = 1分 (200px = 10分)
+
+                int new_min = (int)slide_base_min + delta_min;
+                if (new_min < 1) new_min = 1;
+                if (new_min > MAX_MIN) new_min = MAX_MIN;
+
+                if (status == READY_A || status == PAUSED_A) {
+                    current_a_min = new_min;
+                    if (status == PAUSED_A) {
+                        paused_remaining_ms = current_a_min * 60 * 1000;
+                        total_duration_ms = paused_remaining_ms;
+                    }
+                } else {
+                    current_b_min = new_min;
+                    if (status == PAUSED_B) {
+                        paused_remaining_ms = current_b_min * 60 * 1000;
+                        total_duration_ms = paused_remaining_ms;
+                    }
+                }
+                update();
             }
+        } else {
+            is_sliding = false;
         }
     }
 }
@@ -277,13 +290,15 @@ void PomodoroMod::idle(void) {
         if (elapsed >= total_duration_ms) {
             triggerNotification();
 
-            // A終了 -> すぐにBスタート、 B終了 -> すぐにAスタート
+            // タイムアップ時の切り替え（カスタム時間は1回限りのため標準値へリセットして復帰）
             if (status == RUNNING_A) {
+                current_a_min = default_a_min; // Aを標準値に復元
                 current_b_min = default_b_min;
                 start_time_ms = millis();
                 total_duration_ms = current_b_min * 60 * 1000;
                 status = RUNNING_B;
             } else {
+                current_b_min = default_b_min; // Bを標準値に復元
                 current_a_min = default_a_min;
                 start_time_ms = millis();
                 total_duration_ms = current_a_min * 60 * 1000;

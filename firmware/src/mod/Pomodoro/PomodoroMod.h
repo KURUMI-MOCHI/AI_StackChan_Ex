@@ -14,6 +14,7 @@
 
 #define DEFAULT_A_MIN 25
 #define DEFAULT_B_MIN 5
+#define MAX_MIN       60  // インジケーター上限 (60分)
 
 typedef enum {
     READY_A,
@@ -32,7 +33,6 @@ private:
 
     PomodoroStatus status;
     bool isOffline;
-    bool isSilentMode;
 
     uint32_t default_a_min;
     uint32_t default_b_min;
@@ -43,7 +43,10 @@ private:
     uint32_t total_duration_ms;
     uint32_t paused_remaining_ms;
 
-    int16_t last_touch_y;
+    // スライド操作用
+    bool is_sliding;
+    int16_t touch_start_y;
+    uint32_t slide_base_min;
 
     // 頭頂部なでなでリアクション用変数
     bool headTouchHappyActive;
