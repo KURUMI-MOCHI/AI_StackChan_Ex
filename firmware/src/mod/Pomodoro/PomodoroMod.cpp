@@ -11,20 +11,15 @@ extern Robot *robot;
 extern bool servo_home;
 ///////////////
 
-// コの字型インジケーターのパス定義（右下1分 -> 上中央30分 -> 左下60分）
+// コの字型パスの定義（左下60分 -> 左上角 -> 上中央30分 -> 右上角 -> 右下1分）
 struct Point { float x; float y; };
 static const Point PATH_POINTS[] = {
-    {230.0f, 180.0f}, // 1分 (右下端)
-    {270.0f, 180.0f}, // 右下コーナー斜め始点
-    {304.0f, 145.0f}, // 右下コーナー斜め終点
-    {304.0f, 65.0f},  // 右上コーナー斜め始点
-    {270.0f, 16.0f},  // 右上コーナー斜め終点
-    {160.0f, 16.0f},  // 上中央 (30分)
-    {50.0f,  16.0f},  // 左上コーナー斜め始点
-    {16.0f,  45.0f},  // 左上コーナー斜め終点
-    {16.0f,  145.0f}, // 左下コーナー斜め始点
-    {50.0f,  180.0f}, // 左下コーナー斜め終点
-    {90.0f,  180.0f}  // 60分 (左下端)
+    {16.0f,  180.0f}, // 60分 (左下端)
+    {16.0f,  40.0f},  // 左上コーナー始点 (垂直)
+    {40.0f,  16.0f},  // 左上コーナー終点 (斜め)
+    {280.0f, 16.0f},  // 右上コーナー始点 (水平)
+    {304.0f, 40.0f},  // 右上コーナー終点 (斜め)
+    {304.0f, 180.0f}  // 1分 (右下端・垂直)
 };
 static const int NUM_PATH_POINTS = sizeof(PATH_POINTS) / sizeof(PATH_POINTS[0]);
 
@@ -43,7 +38,7 @@ PomodoroMod::PomodoroMod(bool _isOffline)
 
     // タッチエリア設定
     box_center.setupBox(80, 60, 160, 120);    // 顔中央（スタート/一時停止）
-    box_balloon.setupBox(110, 175, 100, 50);  // 画面下部中央の狭い吹き出しエリア（A/B切替）
+    box_balloon.setupBox(120, 180, 80, 45);   // 画面下部中央の狭い吹き出しエリア（A/B切替）
 }
 
 void PomodoroMod::init(void) {
@@ -60,7 +55,7 @@ void PomodoroMod::init(void) {
 void PomodoroMod::pause(void) {
     avatar.set_isSubWindowEnable(false);
     avatar.setSpeechText("");
-    LedController.setEmotion(LedEmotion::NORMAL);
+    LedController.setCustomStandbyColor(255, 60, 0);
     LedController.setState(LedState::STANDBY);
     if (status == RUNNING_A || status == RUNNING_B) {
         status = (status == RUNNING_A) ? PAUSED_A : PAUSED_B;
@@ -74,11 +69,15 @@ void PomodoroMod::btnA_pressed(void) {
 
 void PomodoroMod::btnB_pressed(void) {
     LedController.flashFeedback();
+    // モード切替時に時間はそれぞれの初期値へリセット
     if (status == READY_A || status == PAUSED_A) {
         status = READY_B;
     } else if (status == READY_B || status == PAUSED_B) {
         status = READY_A;
     }
+    current_a_min = default_a_min;
+    current_b_min = default_b_min;
+
     updateLEDState();
     updateSpeechText();
     update();
@@ -88,7 +87,7 @@ void PomodoroMod::btnC_pressed(void) {
     LedController.flashFeedback();
 }
 
-// 吹き出し文字列の更新 (プレフィックスなし、A:25m... のみ)
+// 吹き出し文字列の更新 (A:25m... のみ)
 void PomodoroMod::updateSpeechText(void) {
     bool isModeA = (status == RUNNING_A || status == PAUSED_A || status == READY_A);
     uint32_t target_total_min = isModeA ? current_a_min : current_b_min;
@@ -200,9 +199,8 @@ void PomodoroMod::update(void) {
     avatar.updateSubWindowCustom(PomodoroMod::drawSubWindow, this, 0, 0, 320, 240);
 }
 
-// LEDカラー設定（なでなで等のHAPPY状態から確実に各モードの色へ復帰させる修正）
+// LEDカラー設定（`setEmotion`を排除し、各モードの色を明確に保持）
 void PomodoroMod::updateLEDState(void) {
-    LedController.setEmotion(LedEmotion::NORMAL); // 感情ステートをリセットして競合を防止
     if (status == RUNNING_A || status == READY_A || status == PAUSED_A) {
         LedController.setCustomStandbyColor(255, 60, 0);   // モードA: オレンジ
     } else {
@@ -244,7 +242,7 @@ void PomodoroMod::updateHeadTouchExpression(void) {
     if (headTouchHappyActive && millis() >= headTouchHappyUntilMs) {
         headTouchHappyActive = false;
         avatar.setExpression(Expression::Neutral);
-        updateLEDState(); // 復帰時に各モードのLEDカラーを確実に再適用
+        updateLEDState(); // 復帰時にモードの色を明確に再適用
 
         if (robot != nullptr && robot->servo != nullptr) {
             robot->servo->moveToOrigin();
@@ -255,7 +253,7 @@ void PomodoroMod::updateHeadTouchExpression(void) {
 
 // タッチ座標がインジケーター付近の外周部にあるか判定
 bool PomodoroMod::isRingArea(int16_t x, int16_t y) {
-    return (x <= 20 || x >= 300 || y <= 20 || y >= 175);
+    return (x <= 35 || x >= 285 || y <= 35);
 }
 
 // タッチ座標から コの字パス上の最も近い位置を求めて 1〜60分 を算出
@@ -305,7 +303,7 @@ uint32_t PomodoroMod::getMinuteFromTouchPos(int16_t x, int16_t y) {
     return min_val;
 }
 
-// ダイヤルなぞり操作のリアルタイム適用
+// ダイヤルなぞり操作の適用（今のサイクルのみ一時変更）
 void PomodoroMod::handleDialTouch(int16_t x, int16_t y) {
     if (status != READY_A && status != PAUSED_A && status != READY_B && status != PAUSED_B) {
         return;
@@ -343,6 +341,10 @@ void PomodoroMod::display_touched(int16_t x, int16_t y) {
         } else {
             status = READY_A;
         }
+        // モード変更時は両方の時間をそれぞれの初期値へリセット
+        current_a_min = default_a_min;
+        current_b_min = default_b_min;
+
         updateLEDState();
         updateSpeechText();
         update();
@@ -408,7 +410,7 @@ void PomodoroMod::idle(void) {
         if (elapsed >= total_duration_ms) {
             triggerNotification();
 
-            // タイムアップ時の自動連続切り替え（標準値へ自動復帰）
+            // タイムアップ時の自動連続切り替え（次のサイクルは必ず初期値に自動復帰）
             if (status == RUNNING_A) {
                 current_a_min = default_a_min;
                 current_b_min = default_b_min;
