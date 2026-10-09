@@ -212,7 +212,7 @@ void PomodoroMod::triggerNotification(void) {
     }
 }
 
-// なでなで中も setEmotion を使わず customStandbyColor で一時的に明るい色にするよう修正
+// なでなで時はLED色を変更せず、表情とサーボの動きのみ実行するよう修正
 void PomodoroMod::updateHeadTouchExpression(void) {
     HeadTouchSensor::Gesture gesture = HeadTouchSensor::update();
 
@@ -223,9 +223,7 @@ void PomodoroMod::updateHeadTouchExpression(void) {
             servo_home = false;
 
             avatar.setExpression(Expression::Happy);
-            // 感情ステートを使わず、ハッピー時の色（明るい黄色系）をカスタムカラーで直接表現
-            LedController.setCustomStandbyColor(255, 160, 0);
-            LedController.setState(LedState::STANDBY);
+            // ※ LEDカラーは一切変更せず、テーマ色をそのままキープ
 
             if (robot != nullptr && robot->servo != nullptr) {
                 robot->servo->moveTo(0, -5);
@@ -237,7 +235,7 @@ void PomodoroMod::updateHeadTouchExpression(void) {
     if (headTouchHappyActive && millis() >= headTouchHappyUntilMs) {
         headTouchHappyActive = false;
         avatar.setExpression(Expression::Neutral);
-        updateLEDState(); // 復帰時に現在のモードの色（オレンジ or ティール）へ確実に再適用
+        // ※ 復帰時もLED色変更は不要（常にテーマ色が維持されているため）
 
         if (robot != nullptr && robot->servo != nullptr) {
             robot->servo->moveToOrigin();
