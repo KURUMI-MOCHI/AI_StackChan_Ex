@@ -85,7 +85,7 @@ void PomodoroMod::drawPomodoroUI(M5Canvas *spi, BoundingRect rect, DrawContext *
         remaining_sec = target_total_min * 60;
     }
 
-    // 1分ごとに1目盛り減る仕様 (全60分割のセグメント)
+    // 1分ごとに1目盛り減る仕様 (全60分割セグメント)
     int active_bars = (remaining_sec + 59) / 60;
     if (active_bars > 60) active_bars = 60;
 
@@ -105,11 +105,11 @@ void PomodoroMod::drawPomodoroUI(M5Canvas *spi, BoundingRect rect, DrawContext *
         int y2 = cy + sin(angle) * r_outer;
 
         spi->drawLine(x1, y1, x2, y2, c);
-        spi->drawLine(x1 + (cos(angle)*0.5f), y1 + (sin(angle)*0.5f), x2, y2, c);
+        spi->drawLine(x1 + (cos(angle) * 0.5f), y1 + (sin(angle) * 0.5f), x2, y2, c);
     }
 
     // --- 2. 上部ヘッダーUI描画 (A, Bの「分:秒」詳細表示) ---
-    spi->setTextSize(1.5); // 少し文字を小さくして秒数が入るように調整
+    spi->setTextSize(1.5);
     spi->setTextColor(TFT_WHITE, TFT_BLACK);
 
     uint32_t disp_min = remaining_sec / 60;
@@ -120,7 +120,6 @@ void PomodoroMod::drawPomodoroUI(M5Canvas *spi, BoundingRect rect, DrawContext *
     String textA = "A:" + String(status == RUNNING_A || status == PAUSED_A || status == READY_A ? String(disp_min) + ":" + sec_buf : String(current_a_min) + ":00");
     String textB = "B:" + String(status == RUNNING_B || status == PAUSED_B || status == READY_B ? String(disp_min) + ":" + sec_buf : String(current_b_min) + ":00");
 
-    // 文字幅に合わせてクリアエリアを少し広げる (110ピクセル)
     spi->fillRect(0, 0, 110, 24, TFT_BLACK);
     spi->fillRect(210, 0, 110, 24, TFT_BLACK);
 
@@ -272,7 +271,7 @@ void PomodoroMod::idle(void) {
     updateHeadTouchExpression();
     update();
 
-    if (status == RUNNING_A || status == RUNning_B) {
+    if (status == RUNNING_A || status == RUNNING_B) {
         uint32_t elapsed = millis() - start_time_ms;
 
         if (elapsed >= total_duration_ms) {
