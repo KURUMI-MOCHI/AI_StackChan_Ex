@@ -27,7 +27,7 @@ typedef enum {
 class PomodoroMod : public ModBase {
 private:
     box_t box_center;
-    box_t box_balloon; // 画面下部の吹き出しエリア（モード切替用）
+    box_t box_balloon; // 画面下部中央の狭い吹き出しエリア（モード切替用）
 
     PomodoroStatus status;
     bool isOffline;
