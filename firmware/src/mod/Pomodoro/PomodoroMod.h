@@ -40,6 +40,11 @@ private:
     uint32_t total_duration_ms;
     uint32_t paused_remaining_ms;
 
+    // 描画・吹き出し更新用変数
+    char speech_buf[64];
+    char last_speech_str[64];
+    uint32_t last_update_ms;
+
     // ダイヤル操作判定用
     bool is_dial_dragging;
 
