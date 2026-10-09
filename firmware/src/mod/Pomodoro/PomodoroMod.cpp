@@ -11,15 +11,13 @@ extern Robot *robot;
 extern bool servo_home;
 ///////////////
 
-// コの字型パスの定義（左下60分 -> 左上角 -> 上中央30分 -> 右上角 -> 右下1分）
+// 画面外周に沿ったコの字型パスの定義（右下1分 -> 右上角 -> 左上角 -> 左下60分）
 struct Point { float x; float y; };
 static const Point PATH_POINTS[] = {
-    {16.0f,  180.0f}, // 60分 (左下端)
-    {16.0f,  40.0f},  // 左上コーナー始点 (垂直)
-    {40.0f,  16.0f},  // 左上コーナー終点 (斜め)
-    {280.0f, 16.0f},  // 右上コーナー始点 (水平)
-    {304.0f, 40.0f},  // 右上コーナー終点 (斜め)
-    {304.0f, 180.0f}  // 1分 (右下端・垂直)
+    {319.0f, 180.0f}, // 1分 (右下端)
+    {319.0f,   0.0f}, // 右上角 (直角)
+    {0.0f,     0.0f}, // 左上角 (直角)
+    {0.0f,   180.0f}  // 60分 (左下端)
 };
 static const int NUM_PATH_POINTS = sizeof(PATH_POINTS) / sizeof(PATH_POINTS[0]);
 
@@ -55,8 +53,7 @@ void PomodoroMod::init(void) {
 void PomodoroMod::pause(void) {
     avatar.set_isSubWindowEnable(false);
     avatar.setSpeechText("");
-    LedController.setCustomStandbyColor(255, 60, 0);
-    LedController.setState(LedState::STANDBY);
+    updateLEDState();
     if (status == RUNNING_A || status == RUNNING_B) {
         status = (status == RUNNING_A) ? PAUSED_A : PAUSED_B;
     }
@@ -69,7 +66,6 @@ void PomodoroMod::btnA_pressed(void) {
 
 void PomodoroMod::btnB_pressed(void) {
     LedController.flashFeedback();
-    // モード切替時に時間はそれぞれの初期値へリセット
     if (status == READY_A || status == PAUSED_A) {
         status = READY_B;
     } else if (status == READY_B || status == PAUSED_B) {
@@ -160,37 +156,33 @@ void PomodoroMod::drawPomodoroUI(M5Canvas *spi, BoundingRect rect, DrawContext *
         
         float current_d = 0.0f;
         float px = PATH_POINTS[0].x, py = PATH_POINTS[0].y;
-        float nx = px, ny = py;
+        int active_seg = 0;
 
         for (int s = 0; s < NUM_PATH_POINTS - 1; s++) {
             if (current_d + seg_lengths[s] >= target_d) {
                 float ratio = (target_d - current_d) / seg_lengths[s];
                 px = PATH_POINTS[s].x + (PATH_POINTS[s+1].x - PATH_POINTS[s].x) * ratio;
                 py = PATH_POINTS[s].y + (PATH_POINTS[s+1].y - PATH_POINTS[s].y) * ratio;
-                nx = PATH_POINTS[s+1].x - PATH_POINTS[s].x;
-                ny = PATH_POINTS[s+1].y - PATH_POINTS[s].y;
+                active_seg = s;
                 break;
             }
             current_d += seg_lengths[s];
         }
 
-        float len = sqrt(nx*nx + ny*ny);
-        if (len > 0) {
-            nx /= len; ny /= len;
-            float cx = 160.0f, cy = 120.0f;
-            float vx = px - cx, vy = py - cy;
-            float vlen = sqrt(vx*vx + vy*vy);
-            if (vlen > 0) {
-                vx /= vlen; vy /= vlen;
-                int x_outer = (int)px;
-                int y_outer = (int)py;
-                int x_inner = (int)(px - vx * 14.0f);
-                int y_inner = (int)(py - vy * 14.0f);
+        // 各辺に応じた正確な内向き法線ベクトル（右辺→左、上辺→下、左辺→右）
+        float dir_x = 0.0f, dir_y = 0.0f;
+        if (active_seg == 0)      { dir_x = -1.0f; dir_y = 0.0f; } // 右辺
+        else if (active_seg == 1) { dir_x = 0.0f;  dir_y = 1.0f; } // 上辺
+        else if (active_seg == 2) { dir_x = 1.0f;  dir_y = 0.0f; } // 左辺
 
-                spi->drawLine(x_outer, y_outer, x_inner, y_inner, theme_color);
-                spi->drawLine(x_outer + 1, y_outer, x_inner + 1, y_inner, theme_color);
-            }
-        }
+        int x_outer = (int)px;
+        int y_outer = (int)py;
+        int x_inner = (int)(px + dir_x * 14.0f);
+        int y_inner = (int)(py + dir_y * 14.0f);
+
+        spi->drawLine(x_outer, y_outer, x_inner, y_inner, theme_color);
+        spi->drawLine(x_outer + (dir_y != 0 ? 1 : 0), y_outer + (dir_x != 0 ? 1 : 0),
+                      x_inner + (dir_y != 0 ? 1 : 0), y_inner + (dir_x != 0 ? 1 : 0), theme_color);
     }
 }
 
@@ -199,7 +191,7 @@ void PomodoroMod::update(void) {
     avatar.updateSubWindowCustom(PomodoroMod::drawSubWindow, this, 0, 0, 320, 240);
 }
 
-// LEDカラー設定（`setEmotion`を排除し、各モードの色を明確に保持）
+// LEDカラー設定（モードA: オレンジ / モードB: ティールグリーン）
 void PomodoroMod::updateLEDState(void) {
     if (status == RUNNING_A || status == READY_A || status == PAUSED_A) {
         LedController.setCustomStandbyColor(255, 60, 0);   // モードA: オレンジ
@@ -242,7 +234,7 @@ void PomodoroMod::updateHeadTouchExpression(void) {
     if (headTouchHappyActive && millis() >= headTouchHappyUntilMs) {
         headTouchHappyActive = false;
         avatar.setExpression(Expression::Neutral);
-        updateLEDState(); // 復帰時にモードの色を明確に再適用
+        updateLEDState(); // 復帰時に現在のモードのLEDカラーを確実に再適用
 
         if (robot != nullptr && robot->servo != nullptr) {
             robot->servo->moveToOrigin();
@@ -251,9 +243,10 @@ void PomodoroMod::updateHeadTouchExpression(void) {
     }
 }
 
-// タッチ座標がインジケーター付近の外周部にあるか判定
+// 外周部（解像度エッジ付近）のタッチ判定
 bool PomodoroMod::isRingArea(int16_t x, int16_t y) {
-    return (x <= 35 || x >= 285 || y <= 35);
+    if (y > 185) return false;
+    return (x <= 20 || x >= 300 || y <= 20);
 }
 
 // タッチ座標から コの字パス上の最も近い位置を求めて 1〜60分 を算出
