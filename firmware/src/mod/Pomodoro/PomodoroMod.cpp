@@ -182,7 +182,7 @@ void PomodoroMod::drawPomodoroUI(M5Canvas *spi, BoundingRect rect, DrawContext *
 
         spi->drawLine(x_outer, y_outer, x_inner, y_inner, theme_color);
         spi->drawLine(x_outer + (dir_y != 0 ? 1 : 0), y_outer + (dir_x != 0 ? 1 : 0),
-                      x_inner + (dir_y != 0 ? 1 : 0), y_inner + (dir_x != 0 ? 1 : 0), theme_color);
+                      x_inner + (dir_y != 0 ? 1 : 0), y_inner + (dir_y != 0 ? 1 : 0), theme_color);
     }
 }
 
@@ -212,7 +212,7 @@ void PomodoroMod::triggerNotification(void) {
     }
 }
 
-// なでなで時はLED色を変更せず、表情とサーボの動きのみ実行するよう修正
+// なでなで時はLED色を変えず表情とサーボのみ動かす
 void PomodoroMod::updateHeadTouchExpression(void) {
     HeadTouchSensor::Gesture gesture = HeadTouchSensor::update();
 
@@ -223,7 +223,7 @@ void PomodoroMod::updateHeadTouchExpression(void) {
             servo_home = false;
 
             avatar.setExpression(Expression::Happy);
-            // ※ LEDカラーは一切変更せず、テーマ色をそのままキープ
+            // ※ LEDカラーは一切変更しない
 
             if (robot != nullptr && robot->servo != nullptr) {
                 robot->servo->moveTo(0, -5);
@@ -235,7 +235,7 @@ void PomodoroMod::updateHeadTouchExpression(void) {
     if (headTouchHappyActive && millis() >= headTouchHappyUntilMs) {
         headTouchHappyActive = false;
         avatar.setExpression(Expression::Neutral);
-        // ※ 復帰時もLED色変更は不要（常にテーマ色が維持されているため）
+        updateLEDState(); // 念のため復帰時も再適用
 
         if (robot != nullptr && robot->servo != nullptr) {
             robot->servo->moveToOrigin();
@@ -377,6 +377,9 @@ void PomodoroMod::display_touched(int16_t x, int16_t y) {
 
 void PomodoroMod::idle(void) {
     updateHeadTouchExpression();
+
+    // ★ここで毎ループ確実に現在のモードカラーを維持する（外部からのNORMAL上書きを即座にガード）
+    updateLEDState();
 
     // コの字型インジケーターのなぞり判定 (READY/PAUSED 時)
     if (status == READY_A || status == PAUSED_A || status == READY_B || status == PAUSED_B) {
