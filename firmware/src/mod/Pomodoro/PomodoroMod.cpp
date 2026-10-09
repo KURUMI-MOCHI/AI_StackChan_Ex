@@ -11,6 +11,10 @@ extern Robot *robot;
 extern bool servo_home;
 ///////////////
 
+// アーチ状インジケーターの角度定義 (右下 45° 〜 左下 -225°)
+static const float ARC_START_DEG = 45.0f;   // 0分/1分側（右下）
+static const float ARC_END_DEG   = -225.0f; // 60分側（左下）
+
 PomodoroMod::PomodoroMod(bool _isOffline)
   : isOffline{_isOffline}, last_update_ms{0}, is_dial_dragging{false},
     headTouchHappyActive{false}, headTouchHappyUntilMs{0}, prev_servo_home_state{true}
@@ -24,8 +28,9 @@ PomodoroMod::PomodoroMod(bool _isOffline)
     memset(speech_buf, 0, sizeof(speech_buf));
     memset(last_speech_str, 0, sizeof(last_speech_str));
 
-    // 顔中央のタップ検出ボックス (スタート/一時停止用)
-    box_center.setupBox(80, 60, 160, 120);
+    // タッチエリア設定
+    box_center.setupBox(80, 60, 160, 120);    // 顔中央（スタート/一時停止）
+    box_balloon.setupBox(30, 155, 260, 80);   // 画面下部の吹き出しエリア（A/B切替）
 }
 
 void PomodoroMod::init(void) {
@@ -56,7 +61,7 @@ void PomodoroMod::btnA_pressed(void) {
 
 void PomodoroMod::btnB_pressed(void) {
     LedController.flashFeedback();
-    // モード切替トグル
+    // 物理ボタンBでもモード切替
     if (status == READY_A || status == PAUSED_A) {
         status = READY_B;
     } else if (status == READY_B || status == PAUSED_B) {
@@ -71,7 +76,7 @@ void PomodoroMod::btnC_pressed(void) {
     LedController.flashFeedback();
 }
 
-// 吹き出し（SpeechText）の安全な更新処理（文字化け・明滅防止）
+// 吹き出し文字列の更新 (Focus等のプレフィックスなし、A:25m... のみ)
 void PomodoroMod::updateSpeechText(void) {
     bool isModeA = (status == RUNNING_A || status == PAUSED_A || status == READY_A);
     uint32_t target_total_min = isModeA ? current_a_min : current_b_min;
@@ -92,13 +97,11 @@ void PomodoroMod::updateSpeechText(void) {
     if (status == READY_A) disp_min = current_a_min;
     if (status == READY_B) disp_min = current_b_min;
 
-    // クラスメンババッファに文字列を作成
-    snprintf(speech_buf, sizeof(speech_buf), "%s %lum%s",
-             isModeA ? "Focus A:" : "Break B:",
+    snprintf(speech_buf, sizeof(speech_buf), "%s:%lum%s",
+             isModeA ? "A" : "B",
              disp_min,
              (status == RUNNING_A || status == RUNNING_B) ? "..." : "");
 
-    // 内容が変化した時のみ setSpeechText を呼び出す（描画チラつき防止）
     if (strcmp(last_speech_str, speech_buf) != 0) {
         strncpy(last_speech_str, speech_buf, sizeof(last_speech_str));
         avatar.setSpeechText(speech_buf);
@@ -131,39 +134,26 @@ void PomodoroMod::drawPomodoroUI(M5Canvas *spi, BoundingRect rect, DrawContext *
     int active_bars = (remaining_sec + 59) / 60;
     if (active_bars > MAX_MIN) active_bars = MAX_MIN;
 
-    // --- 1. 横長楕円弧インジケーター描画 (下側の吹き出し領域を回避・極太仕様) ---
+    // --- 1. アーチ状インジケーターの60等分描画 (右下 -> 上中央 -> 左下) ---
     int cx = 160;
     int cy = 120;
-    float rx_outer = 145.0f;
-    float ry_outer = 105.0f;
-    float rx_inner = 120.0f;
-    float ry_inner = 80.0f;
+    float rx_outer = 142.0f;
+    float ry_outer = 102.0f;
+    float rx_inner = 126.0f; // すっきりした適度な太さ
+    float ry_inner = 86.0f;
 
     for (int i = 1; i <= active_bars; i++) {
-        // 12時方向 (angle = -90 deg) から時計周り
-        float angle_deg = -90.0f + (i * 6.0f);
+        float ratio = (float)i / 60.0f;
+        float angle_deg = ARC_START_DEG + (ARC_END_DEG - ARC_START_DEG) * ratio;
         float angle_rad = angle_deg * DEG_TO_RAD;
 
-        int x_o = cx + (int)(cos(angle_rad) * rx_outer);
-        int y_o = cy + (int)(sin(angle_rad) * ry_outer);
+        int xo = cx + (int)(cos(angle_rad) * rx_outer);
+        int yo = cy + (int)(sin(angle_rad) * ry_outer);
+        int xi = cx + (int)(cos(angle_rad) * rx_inner);
+        int yi = cy + (int)(sin(angle_rad) * ry_inner);
 
-        // ★ 吹き出しを避けるため、画面下部中央（y >= 165 かつ 60 <= x <= 260）の描画をスキップ
-        if (y_o >= 165 && x_o >= 60 && x_o <= 260) {
-            continue;
-        }
-
-        int x_i = cx + (int)(cos(angle_rad) * rx_inner);
-        int y_i = cy + (int)(sin(angle_rad) * ry_inner);
-
-        // 太いセグメントを描画 (幅5pxのマルチライン描画)
-        for (int w = -2; w <= 2; w++) {
-            float offset_angle = (angle_deg + (w * 0.8f)) * DEG_TO_RAD;
-            int xo = cx + (int)(cos(offset_angle) * rx_outer);
-            int yo = cy + (int)(sin(offset_angle) * ry_outer);
-            int xi = cx + (int)(cos(offset_angle) * rx_inner);
-            int yi = cy + (int)(sin(offset_angle) * ry_inner);
-            spi->drawLine(xi, yi, xo, yo, theme_color);
-        }
+        spi->drawLine(xi, yi, xo, yo, theme_color);
+        spi->drawLine(xi + 1, yi, xo + 1, yo, theme_color);
     }
 }
 
@@ -223,21 +213,28 @@ void PomodoroMod::updateHeadTouchExpression(void) {
     }
 }
 
-// 触った位置が外周インジケーター（リング領域）内かどうかの判定
+// 触った位置がアーチ状インジケーター領域内かどうかの判定
 bool PomodoroMod::isRingArea(int16_t x, int16_t y) {
-    float dx = (float)(x - 160) / 132.5f;
-    float dy = (float)(y - 120) / 92.5f;
+    float dx = (float)(x - 160) / 134.0f;
+    float dy = (float)(y - 120) / 94.0f;
     float dist = sqrt(dx * dx + dy * dy);
-    return (dist >= 0.70f && dist <= 1.25f);
+    return (dist >= 0.75f && dist <= 1.20f);
 }
 
-// 楕円上のタッチ角度から 1〜60分 の数値を計算
+// タッチ座標の角度から アーチ上の1〜60分 を算出
 uint32_t PomodoroMod::getMinuteFromTouchPos(int16_t x, int16_t y) {
     float angle_rad = atan2((float)(y - 120), (float)(x - 160));
-    float angle_deg = angle_rad * RAD_TO_DEG + 90.0f; // 12時位置を 0 deg に補正
-    if (angle_deg < 0) angle_deg += 360.0f;
+    float angle_deg = angle_rad * RAD_TO_DEG;
 
-    int min_val = (int)round(angle_deg / 6.0f);
+    if (angle_deg > ARC_START_DEG) {
+        angle_deg -= 360.0f;
+    }
+
+    float progress = (ARC_START_DEG - angle_deg) / (ARC_START_DEG - ARC_END_DEG);
+    if (progress < 0.0f) progress = 0.0f;
+    if (progress > 1.0f) progress = 1.0f;
+
+    int min_val = (int)round(progress * 60.0f);
     if (min_val < 1) min_val = 1;
     if (min_val > MAX_MIN) min_val = MAX_MIN;
     return min_val;
@@ -273,7 +270,21 @@ void PomodoroMod::handleDialTouch(int16_t x, int16_t y) {
 }
 
 void PomodoroMod::display_touched(int16_t x, int16_t y) {
-    // 中央タップ：スタート / 一時停止
+    // 1. 画面下部の吹き出しエリアをタップ：A/B モード切り替え
+    if (box_balloon.contain(x, y)) {
+        LedController.flashFeedback();
+        if (status == READY_A || status == PAUSED_A || status == RUNNING_A) {
+            status = READY_B;
+        } else {
+            status = READY_A;
+        }
+        updateLEDState();
+        updateSpeechText();
+        update();
+        return;
+    }
+
+    // 2. 中央タップ：スタート / 一時停止
     if (box_center.contain(x, y)) {
         LedController.flashFeedback();
         if (status == READY_A) {
@@ -306,11 +317,12 @@ void PomodoroMod::display_touched(int16_t x, int16_t y) {
 void PomodoroMod::idle(void) {
     updateHeadTouchExpression();
 
-    // インジケーターリングなぞり判定 (READY/PAUSED 時)
+    // アーチ型インジケーターのなぞり判定 (READY/PAUSED 時)
     if (status == READY_A || status == PAUSED_A || status == READY_B || status == PAUSED_B) {
         auto touch_detail = M5.Touch.getDetail();
         if (touch_detail.isPressed()) {
-            if (!box_center.contain(touch_detail.x, touch_detail.y)) {
+            if (!box_center.contain(touch_detail.x, touch_detail.y) &&
+                !box_balloon.contain(touch_detail.x, touch_detail.y)) {
                 if (isRingArea(touch_detail.x, touch_detail.y)) {
                     if (!is_dial_dragging) {
                         LedController.flashFeedback();
