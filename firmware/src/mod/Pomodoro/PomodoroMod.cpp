@@ -206,17 +206,23 @@ void PomodoroMod::updateLEDState(void) {
 }
 
 void PomodoroMod::triggerNotification(void) {
-if (robot && robot->servo) {
-        robot->servo->moveTo(0, -5);
-    }
-    // 白色発光とフィードバック（beep）を3回連続で実行
-    for (int i = 0; i < 3; i++) {
-        LedController.flashFeedback();
-    }
-    delay(1000);
     if (robot && robot->servo) {
-        robot->servo->moveTo(0, 0);
+        // タイムアップ時に左右・上下へダイナミックに首を振る
+        for (int i = 0; i < 3; i++) {
+            robot->servo->moveTo(-30, -10);
+            LedController.flashFeedback();
+            delay(180);
+
+            robot->servo->moveTo(30, 10);
+            delay(180);
+        }
+        robot->servo->moveToOrigin();
+    } else {
+        for (int i = 0; i < 3; i++) {
+            LedController.flashFeedback();
+        }
     }
+    delay(400);
 }
 
 void PomodoroMod::updateHeadTouchExpression(void) {
