@@ -207,22 +207,17 @@ void PomodoroMod::updateLEDState(void) {
 
 void PomodoroMod::triggerNotification(void) {
     if (robot && robot->servo) {
-        // 元の上下の控えめな傾き(-5度)を維持しつつ、左右は控えめ（±8度）に優しく振る
-        for (int i = 0; i < 3; i++) {
-            robot->servo->moveTo(-8, -5);
-            LedController.flashFeedback();
-            delay(200);
+        // 1. 首を上げながら右に8度振る
+        robot->servo->moveTo(8, -5);
+        LedController.flashFeedback();
+        delay(500);
 
-            robot->servo->moveTo(8, -5);
-            delay(200);
-        }
-        robot->servo->moveToOrigin();
+        // 2. 首を下げながら正面（0度）に戻す
+        robot->servo->moveTo(0, 0);
+        delay(500);
     } else {
-        for (int i = 0; i < 3; i++) {
-            LedController.flashFeedback();
-        }
+        LedController.flashFeedback();
     }
-    delay(400);
 }
 
 void PomodoroMod::updateHeadTouchExpression(void) {
