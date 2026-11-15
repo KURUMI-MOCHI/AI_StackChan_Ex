@@ -46,12 +46,9 @@ void RealtimeAiMod::init(void)
 {
   avatar.set_isSubWindowEnable(true);
 
-  // ★ 起動時・モード切り替え時にサーボの状態に合わせてLED初期状態を設定
-  if (servo_home) {
-    LedController.setState(LedState::OFF);
-  } else {
-    LedController.setState(LedState::STANDBY);
-  }
+  // ★ 起動時はLEDモードをオンにしてスタンバイ状態にする
+  led_on = true;
+  LedController.setState(LedState::STANDBY);
 
   if (pRtLLM != nullptr) {
     pRtLLM->invokeWebSocketLoopTask();

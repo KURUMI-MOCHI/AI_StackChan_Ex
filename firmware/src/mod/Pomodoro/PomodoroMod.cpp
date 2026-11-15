@@ -206,10 +206,13 @@ void PomodoroMod::updateLEDState(void) {
 }
 
 void PomodoroMod::triggerNotification(void) {
-    if (robot && robot->servo) {
+if (robot && robot->servo) {
         robot->servo->moveTo(0, -5);
     }
-    LedController.flashFeedback();
+    // 白色発光とフィードバック（beep）を3回連続で実行
+    for (int i = 0; i < 3; i++) {
+        LedController.flashFeedback();
+    }
     delay(1000);
     if (robot && robot->servo) {
         robot->servo->moveTo(0, 0);
