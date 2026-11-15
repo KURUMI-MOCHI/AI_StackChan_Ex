@@ -207,14 +207,14 @@ void PomodoroMod::updateLEDState(void) {
 
 void PomodoroMod::triggerNotification(void) {
     if (robot && robot->servo) {
-        // タイムアップ時に左右・上下へダイナミックに首を振る
+        // 元の上下の控えめな傾き(-5度)を維持しつつ、左右は控えめ（±8度）に優しく振る
         for (int i = 0; i < 3; i++) {
-            robot->servo->moveTo(-30, -10);
+            robot->servo->moveTo(-8, -5);
             LedController.flashFeedback();
-            delay(180);
+            delay(200);
 
-            robot->servo->moveTo(30, 10);
-            delay(180);
+            robot->servo->moveTo(8, -5);
+            delay(200);
         }
         robot->servo->moveToOrigin();
     } else {
