@@ -208,7 +208,7 @@ void PomodoroMod::updateLEDState(void) {
 void PomodoroMod::triggerNotification(void) {
     if (robot && robot->servo) {
         // 1. 首を上げながら右に8度振る
-        robot->servo->moveTo(8, -5);
+        robot->servo->moveTo(-8, -5);
         LedController.flashFeedback();
         delay(500);
 
